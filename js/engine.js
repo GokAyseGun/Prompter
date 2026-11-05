@@ -12,7 +12,7 @@ export const P = {
   on:false, cal:false, A:null, chars:[], cls:null, applied:null, tokEls:[], lines:[], knots:[], KI:[], win:1, total:0, u:0,
   playing:false, ended:false, counting:false, countEnd:0, holdIdx:0, holdLeft:0,
   scroll:0, off:0, offV:0, W:0, H:0, anchor:0, fs:40, tone:115, base:[], lineH:50,
-  boost:0, gain:1, lastH:0, mark:-1, lead:true, syncAdj:0,
+  boost:0, gain:1, lastH:0, mark:-1, lead:true, syncAdj:0, rateNow:0, fRate:null,
   scriptId:null, title:'', body:'', targetSec:null, rev:0,
   playSec:0, activeSec:0, stops:0, rewinds:0, startedAt:0, uStart:0, maxU:0,
 };
@@ -346,8 +346,8 @@ export function follow(st){
   P.playing = !!st.playing; P.ended = !!st.ended;
   if (st.counting && !P.counting) { P.counting = true; P.countEnd = performance.now() + (st.countLeft || 0); el.count.hidden = false; }
   if (!st.counting && P.counting) { P.counting = false; el.count.hidden = true; }
-  P.gain = st.gain ?? 1; P.holdLeft = st.holding ? Math.max(P.holdLeft, 0.05) : 0;
-  const target = charToU(st.c) + (st.playing ? S.g.sps * P.gain * 0.12 : 0);
+  P.gain = st.gain ?? 1; P.fRate = st.rate != null ? st.rate : null; P.holdLeft = st.holding ? Math.max(P.holdLeft, 0.05) : 0;
+  const target = charToU(st.c) + (st.playing ? (P.fRate != null ? P.fRate : S.g.sps * P.gain) * 0.05 : 0);
   const diff = target - P.u;
   if (Math.abs(diff) > S.g.sps * 2.5) seek(target); else P.syncAdj = diff;
   updateHud();
@@ -417,12 +417,12 @@ function drawClock(now){
   }
   el.clock.innerHTML = s;
 }
-let vOpen = false;
+let vOpen = false, vLat = null;
 function drawVoice(){
   if (S.g.mode === 'fixed' || !prof().show.voice || P.cal) { el.vind.hidden = true; return; }
   el.vind.hidden = false;
   el.vind.classList.toggle('on', vOpen);
-  el.vind.dataset.m = S.g.mode === 'follow' ? 'TAKİP' : 'SES';
+  el.vind.dataset.m = S.g.mode === 'follow' ? 'TAKİP' + (vLat != null && S.g.followAuto !== false ? ` · gecikme ≈${num(vLat, 1)} sn` : '') : 'SES';
   const lv = H.level(), pct = clamp((lv + 70) / 60, 0, 1);
   el.vlev.style.setProperty('--lv', (pct * 100).toFixed(1) + '%');
   el.vlev.style.setProperty('--th', (clamp((S.g.gateDb + 70) / 60, 0, 1) * 100).toFixed(1) + '%');
@@ -503,7 +503,7 @@ export function state(){
   if (!P.on || P.cal) return {onStage: false};
   return {onStage: true, scriptId: P.scriptId, title: P.title, rev: P.rev, c: +headChar().toFixed(2), u: P.u, total: P.total,
     playing: P.playing, counting: P.counting, countLeft: P.counting ? Math.max(0, P.countEnd - performance.now()) : 0, ended: P.ended,
-    gain: +P.gain.toFixed(3), sps: S.g.sps, avgSyl: P.A.avgSyl, mode: S.g.mode,
+    gain: +P.gain.toFixed(3), rate: +(P.rateNow || 0).toFixed(3), sps: S.g.sps, avgSyl: P.A.avgSyl, mode: S.g.mode,
     elapsed: P.playSec, remain: remainSec(), target: P.targetSec, voiceOpen: vOpen, holding: P.holdLeft > 0,
     sections: P.A.sections.map(s => s.title), pct: P.total ? P.u / P.total : 0};
 }
@@ -524,30 +524,32 @@ export function tick(now, dt){
   }
   const base = S.g.sps;
   let rate = 0;
-  const vf = H.voice();              // {open, targetC, lastHit} — sadece lider kullanır
-  vOpen = vf ? !!vf.open : false;
+  const vf = H.voice();              // {open, targetC, rate, lat} — sadece lider kullanır
+  vOpen = vf ? !!vf.open : false; vLat = vf && vf.lat != null ? vf.lat : null;
   if (P.lead) {
     if (P.boost) rate = P.boost * base * S.g.boostMul;
     else if (P.playing && !P.cal) {
       if (P.holdLeft > 0) P.holdLeft -= dt;
       else {
-        let want = 1;
+        let want = 1, fb = base;
         if (S.g.mode === 'gate' && vf) want = vf.open ? 1 : 0;
         if (S.g.mode === 'follow' && vf) {
           if (vf.targetC == null) want = vf.open ? 1 : 0;
           else {
-            const diff = charToU(vf.targetC) + base * 0.45 - P.u;
-            want = clamp(1 + diff / (base * 1.2), 0, 2.6);
-            if (!vf.open && now - vf.lastHit > 1200) want = 0;
+            fb = clamp(vf.rate || base, 1.5, 10);                 // senin gerçek okuma hızın
+            const diff = charToU(vf.targetC) - P.u;                // tahmini okuduğun yer (+ öne alma) ile ekrandaki fark
+            if (diff > fb * 6 || diff < -fb * 6) { seek(charToU(vf.targetC)); }
+            want = vf.open ? clamp(1 + diff / (fb * 0.8), 0, 3) : 0;
           }
         }
         const tau = want > P.gain ? 0.08 : 0.22;
         P.gain += (want - P.gain) * (1 - Math.exp(-dt / tau));
-        rate = base * P.gain;
+        rate = fb * P.gain;
       }
     }
+    P.rateNow = rate;
   } else if (P.playing && P.holdLeft <= 0) {
-    rate = base * P.gain;
+    rate = P.fRate != null ? P.fRate : base * P.gain;
     if (P.syncAdj) { const k = Math.min(1, dt * 3); P.u += P.syncAdj * k; P.syncAdj *= (1 - k); if (Math.abs(P.syncAdj) < 0.01) P.syncAdj = 0; }
   }
   if (P.playing || P.holdLeft > 0) P.playSec += dt;

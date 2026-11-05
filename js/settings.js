@@ -46,6 +46,7 @@ export const DEF_G = {
   sps:DEF_SPS, personalSps:null, mode:'fixed',
   fadeWidth:6, readTone:0.45, readOpacity:0.6,
   pauseOn:true, pauseScale:1, lead:1, focusStrength:0.55,
+  followLead:1, followAuto:true,
   countdown:true, fullscreen:true, boostMul:3,
   gateDb:-45, gateHold:0.9, stickL:'speed', stickR:'scrub', autoClean:false,
 };
@@ -60,6 +61,8 @@ export const ACTIONS = [
   ['boostFwd','Basılı tut: hızlı ileri','bırakınca normale döner'],
   ['boostBack','Basılı tut: hızlı geri',''],
   ['modeCycle','Akış modunu değiştir','Sabit → Ses kapısı → Sesle takip'],
+  ['leadUp','Sesle takip: öne al','+0,5 kelime'],
+  ['leadDown','Sesle takip: geri al','−0,5 kelime'],
   ['restart','Başa dön',''],
   ['exit','Akışı bitir',''],
 ];
@@ -77,6 +80,8 @@ export const DEF_BINDS = {
   boostFwd:   [K('KeyD','d'), {type:'pad',button:7}],
   boostBack:  [K('KeyA','a'), {type:'pad',button:6}],
   modeCycle:  [K('KeyM','m'), {type:'pad',button:17}],
+  leadUp:     [K('KeyE','e')],
+  leadDown:   [K('KeyQ','q')],
   restart:    [K('Home','Home'), {type:'pad',button:3}],
   exit:       [K('Escape','Escape'), {type:'pad',button:9}],
 };

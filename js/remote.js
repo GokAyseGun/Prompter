@@ -31,6 +31,7 @@ export function remoteHTML(){
     <div class="rm-speed"><b class="rm-sps">—</b><small class="rm-wpm"></small></div>
     <input type="range" class="rm-spsr" min="2" max="9" step="0.05">
     <div class="seg rm-mode">${MODES.map(([v, l]) => `<button type="button" data-v="${v}">${l}</button>`).join('')}</div>
+    <div class="rm-lead" hidden><span>Takip öne alma</span><button type="button" data-lead="-1">−</button><b class="rm-leadv">1 kelime</b><button type="button" data-lead="1">+</button></div>
     <div class="rm-voice" hidden><span class="rm-vdot"></span><span class="rm-vtxt">Prompter mikrofonu</span><div class="meter"><div class="meter-fill"></div><div class="meter-th"></div></div></div>
     <div class="rm-sections"></div>
     <div class="rm-row two">
@@ -57,6 +58,7 @@ export function mountRemote(root, api){
       return;
     }
     const m = e.target.closest('.rm-mode button'); if (m) { buzz(); api.setMode(m.dataset.v); return; }
+    const ld = e.target.closest('[data-lead]'); if (ld) { buzz(); api.lead && api.lead(+ld.dataset.lead); return; }
     const s = e.target.closest('[data-sec]'); if (s) { buzz(); api.cmd('seekSection', {value: +s.dataset.sec}); }
   });
   for (const b of root.querySelectorAll('[data-hold]')) {
@@ -123,12 +125,13 @@ export function mountRemote(root, api){
       }
       const mode = (s && s.mode) || meta.mode;
       for (const b of root.querySelectorAll('.rm-mode button')) b.classList.toggle('on', b.dataset.v === mode);
+      const lb = q('.rm-lead'); lb.hidden = mode !== 'follow';
+      if (!lb.hidden && meta.followLead != null) q('.rm-leadv').textContent = num(meta.followLead, 1) + ' kelime';
       const vb = q('.rm-voice'); vb.hidden = !mode || mode === 'fixed';
       if (!vb.hidden && meta.voice) {
         vb.classList.toggle('on', !!meta.voice.open);
-        q('.rm-vtxt').textContent = meta.voice.src ? 'Prompter mikrofonu' + (meta.voice.open ? ' · ses var' : ' · sessiz') : 'Prompter mikrofonu bekleniyor';
-        q('.meter-fill', vb);
-        vb.querySelector('.meter-fill').style.width = clamp((meta.voice.level + 70) / 60 * 100, 0, 100) + '%';
+        q('.rm-vtxt').textContent = meta.voice.src ? 'Prompter mikrofonu' + (meta.voice.open ? ' · ses var' : ' · sessiz') + (mode === 'follow' && meta.voice.lat != null ? ` · gecikme ≈${num(meta.voice.lat, 1)} sn` : '') : 'Prompter mikrofonu bekleniyor';
+            vb.querySelector('.meter-fill').style.width = clamp((meta.voice.level + 70) / 60 * 100, 0, 100) + '%';
         vb.querySelector('.meter-fill').classList.toggle('hot', !!meta.voice.open);
         if (meta.gateDb != null) vb.querySelector('.meter-th').style.left = clamp((meta.gateDb + 70) / 60 * 100, 0, 100) + '%';
       }

@@ -421,3 +421,8 @@ select.txt{appearance:auto}
 
 .devlist li.off{opacity:.65;border-style:dashed}
 .devlist li.off small{color:var(--err)}
+.rm-lead{display:grid;grid-template-columns:1fr 52px auto 52px;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
+.rm-lead button{height:44px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);font-size:22px;cursor:pointer}
+.rm-lead b{color:var(--ice);font-variant-numeric:tabular-nums;min-width:74px;text-align:center}
+.follow-box{margin-top:12px;padding:12px;border:1px solid rgba(166,220,242,.35);border-radius:12px;background:rgba(166,220,242,.05)}
+.follow-box .field:first-child{margin-top:0}

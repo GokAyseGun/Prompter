@@ -68,6 +68,12 @@ export function akisHTML(){
   <div class="fh"><span>Akış modu</span></div>
   ${SEG('mode', 'data-g', [['fixed','Sabit hız'],['gate','Ses kapısı'],['follow','Sesle takip']])}
   <p class="hint mode-hint"></p>
+  <div class="follow-box">
+    ${R('followLead', 'data-g', 'Sesle takip öne alma', 0, 5, 0.5)}
+    <p class="hint" style="margin-top:4px">Sistem okuduğun kelimeyi algılayıp dur-kalk ve hızlanma/yavaşlamayı ona göre yapar; ekranda okuma noktası (solma ve alt çizgi) bu kadar kelime önde gösterilir. Akış sırasında kumandadan veya E / Q tuşlarıyla değiştirilebilir.</p>
+    ${T('followAuto', 'data-g', 'Otomatik gecikme telafisi', 'Konuşma tanımanın gecikmesini ölçer ve okuduğun yeri o kadar ileri tahmin eder; akış senin gerçek okuma hızına uyar')}
+    <p class="hint follow-info"></p>
+  </div>
   <div class="voice-box">
     <div class="fh"><span>Bu cihazın mikrofonu</span><button class="linkbtn mic-test" type="button">Mikrofonu test et</button></div>
     <div class="meter"><div class="meter-fill"></div><div class="meter-th"></div></div>
@@ -114,7 +120,7 @@ const FMT = {
   sps: v => speedText(v, avgSylFn()), fadeWidth: v => Math.round(v) + ' harf',
   readTone: v => '%' + Math.round(v * 100), readOpacity: v => '%' + Math.round(v * 100),
   pauseScale: v => '×' + num(v, 2), lead: v => num(v, 2) + ' hece', focusStrength: v => '%' + Math.round(v * 100),
-  boostMul: v => '×' + num(v, 1), gateDb: v => Math.round(v) + ' dB', gateHold: v => num(v, 1) + ' sn',
+  boostMul: v => '×' + num(v, 1), followLead: v => num(v, 1) + ' kelime', gateDb: v => Math.round(v) + ' dB', gateHold: v => num(v, 1) + ' sn',
 };
 
 /* ctx: { type(): profil tipi, setType?(t): ekran tipini değiştir, onSpeedTest?() } */
@@ -147,6 +153,7 @@ export function bindForm(root, ctx){
     if (q('.rot-field')) q('.rot-field').hidden = pr.orientation === 'auto';
     if (q('.pause-field')) q('.pause-field').classList.toggle('off', !S.g.pauseOn);
     if (q('.voice-box')) q('.voice-box').hidden = S.g.mode === 'fixed';
+    if (q('.follow-box')) q('.follow-box').hidden = S.g.mode !== 'follow';
     if (q('.mode-hint')) q('.mode-hint').textContent = MODE_HINT[S.g.mode];
     if (q('.pause-hint')) { const k = S.g.pauseScale / S.g.sps; q('.pause-hint').textContent = `Bu hızda: virgül ≈ ${num(P_COMMA * k)} sn · nokta ≈ ${num(P_STOP * k)} sn · paragraf sonu ≈ ${num(P_PARA * k)} sn`; }
     if (q('.personal')) q('.personal').textContent = S.g.personalSps ? ` · Ölçülen hızınız: ${num(S.g.personalSps)} hece/sn` : '';
