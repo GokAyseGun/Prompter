@@ -87,26 +87,44 @@ export const DEF_BINDS = {
 };
 export const MODES = [['fixed','Sabit hız'],['gate','Ses kapısı'],['follow','Sesle takip']];
 
-/* ---------- bu cihaz ---------- */
+/* ---------- bu cihaz ----------
+   Aynı tarayıcıda açılan her pencere/sekme ayrı bir cihazdır (ör. Mac ekranında Prompter, harici monitörde Ekran).
+   Pencere kimliği sessionStorage'da tutulur; yeni pencere, ana kimlik başka bir açık pencerede kullanılıyorsa
+   kendine yeni kimlik alır. Cihaz bilgileri kimliğe göre localStorage'da saklanır. */
 const params = new URLSearchParams(location.search);
-export const WIN = params.get('win');                 // ayrı "ekran penceresi" (ör. harici monitör)
-const devStore = WIN ? sessionStorage : localStorage;
+export const WIN = params.get('win');                 // "Ekran penceresi aç" ile açılan pencere
 function guessProfile(){
   const w = Math.min(screen.width, screen.height), touch = matchMedia('(pointer:coarse)').matches;
   if (touch && w < 600) return 'phone';
   if (touch) return 'tablet';
   return Math.max(screen.width, screen.height) >= 2400 ? 'monitor' : 'desktop';
 }
-let dv = {};
-try { dv = JSON.parse(devStore.getItem('prompter.device')) || {}; } catch (e) {}
+const ss = (k, v) => { try { if (v === undefined) return sessionStorage.getItem(k); sessionStorage.setItem(k, v); } catch (e) { return null; } };
+const TAB_KEY = 'prompter.tabDev' + (WIN ? '.' + WIN : '');
+const devices = lsGet('prompter.devices', {});
+const legacy = lsGet('prompter.device', null);                    // eski sürüm: tek cihaz kaydı
+if (legacy && legacy.id && !devices[legacy.id]) { devices[legacy.id] = legacy; lsSet('prompter.primaryDev', legacy.id); }
+let tabId = ss(TAB_KEY), secondary = false;
+if (!tabId) {
+  const prim = lsGet('prompter.primaryDev', null);
+  const alive = prim && Date.now() - (+localStorage.getItem('prompter.hb.' + prim) || 0) < 5000;
+  if (prim && !alive && !WIN) tabId = prim;
+  else { tabId = (WIN ? 'w-' : 'd-') + rid(8); secondary = !!prim; if (!prim && !WIN) lsSet('prompter.primaryDev', tabId); }
+  ss(TAB_KEY, tabId);
+}
+const beat = () => { try { localStorage.setItem('prompter.hb.' + tabId, String(Date.now())); } catch (e) {} };
+beat(); setInterval(beat, 2000);
+window.addEventListener('pagehide', () => { try { localStorage.removeItem('prompter.hb.' + tabId); } catch (e) {} });
+
 export const DEV = Object.assign(
-  WIN ? {id: 'w-' + rid(8), profile: 'monitor', name: 'Monitör penceresi', role: 'ekran', roleAuto: false}
-      : {id: 'd-' + rid(8), profile: guessProfile(), name: '', role: null, roleAuto: true}, dv);
+  WIN ? {profile: 'monitor', name: 'Monitör penceresi', role: 'ekran', roleAuto: false}
+      : {profile: guessProfile(), name: '', role: null, roleAuto: true},
+  devices[tabId] || {}, {id: tabId});
 if (!DEF_PROFILE[DEV.profile]) DEV.profile = guessProfile();
-if (!DEV.name) DEV.name = PNAME[DEV.profile];
+if (!DEV.name) DEV.name = PNAME[DEV.profile] + (secondary ? ' · 2. pencere' : '');
 const qr = params.get('role');
 if (qr && ROLE_NAME[qr]) { DEV.role = qr; DEV.roleAuto = false; }
-export const saveDevice = () => { try { devStore.setItem('prompter.device', JSON.stringify(DEV)); } catch (e) {} };
+export const saveDevice = () => { const d = lsGet('prompter.devices', {}); d[DEV.id] = {...DEV}; lsSet('prompter.devices', d); };
 saveDevice();
 
 /* ---------- ortak ayarlar (hesapla eşitlenir, cihazlar arası canlı aktarılır) ---------- */

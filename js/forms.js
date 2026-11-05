@@ -70,7 +70,7 @@ export function akisHTML(){
   <p class="hint mode-hint"></p>
   <div class="follow-box">
     <div class="fh" style="margin-bottom:0"><span><b style="color:var(--ice)">Sesle takip</b> <span class="follow-off muted">· yalnızca Sesle takip modunda etkilidir</span></span></div>
-    ${R('followLead', 'data-g', 'Öne alma (manuel)', 0, 5, 0.5)}
+    ${R('followLead', 'data-g', 'Öne alma (manuel)', -2, 5, 0.5)}
     <p class="hint" style="margin-top:4px">Sistem okuduğun kelimeyi algılayıp dur-kalk ve hızlanma/yavaşlamayı ona göre yapar; ekranda okuma noktası (solma ve alt çizgi) bu kadar kelime önde gösterilir. Akış sırasında kumandadan veya E / Q tuşlarıyla değiştirilebilir.</p>
     ${T('followAuto', 'data-g', 'Otomatik gecikme telafisi', 'Konuşma tanımanın gecikmesini ölçer ve okuduğun yeri o kadar ileri tahmin eder; akış senin gerçek okuma hızına uyar')}
     <p class="hint follow-info"></p>
@@ -121,7 +121,7 @@ const FMT = {
   sps: v => speedText(v, avgSylFn()), fadeWidth: v => Math.round(v) + ' harf',
   readTone: v => '%' + Math.round(v * 100), readOpacity: v => '%' + Math.round(v * 100),
   pauseScale: v => '×' + num(v, 2), lead: v => num(v, 2) + ' hece', focusStrength: v => '%' + Math.round(v * 100),
-  boostMul: v => '×' + num(v, 1), followLead: v => num(v, 1) + ' kelime', gateDb: v => Math.round(v) + ' dB', gateHold: v => num(v, 1) + ' sn',
+  boostMul: v => '×' + num(v, 1), followLead: v => (v > 0 ? '+' : '') + num(v, 1) + ' kelime', gateDb: v => Math.round(v) + ' dB', gateHold: v => num(v, 1) + ' sn',
 };
 
 /* ctx: { type(): profil tipi, setType?(t): ekran tipini değiştir, onSpeedTest?() } */

@@ -5,7 +5,7 @@ import { normWord } from './text.js';
 export const V = {
   on: false, mode: 'fixed', level: -100, open: false, speaking: false,
   targetC: null, lastHit: 0, lastResult: 0, recOk: false, recErr: '', micErr: '',
-  lat: 0.9, rate: null,               // ölçülen tanıma gecikmesi (sn) ve konuşma hızı (hece/sn, duraklar dahil)
+  lat: 0.6, rate: null,               // ölçülen tanıma gecikmesi (sn) ve konuşma hızı (hece/sn, duraklar dahil)
 };
 const clampN = (v, a, b) => Math.min(b, Math.max(a, v));
 let stream = null, ctx = null, analyser = null, buf = null, lastLoud = 0, loudSince = 0;
@@ -47,7 +47,7 @@ export function readLevel(){
 }
 
 /* Her karede çağrılır: konuşma var mı? */
-let lastTick = 0, wasOpen = false, closedAt = 0, openedAt = 0, speakSinceHit = 0, utterStart = null;
+let lastTick = 0, wasOpen = false, closedAt = 0, openedAt = 0, speakSinceHit = 0, utterStart = null, speechEnd = 0;
 export function tick(now){
   const dt = lastTick ? Math.min(0.1, (now - lastTick) / 1000) : 0; lastTick = now;
   if (!V.on) return;
@@ -67,7 +67,7 @@ export function tick(now){
     if (analyser && now - closedAt > 700) utterStart = {t: now - 70, j: lastJ + 1};
     openedAt = now;
   }
-  if (!V.open && wasOpen) closedAt = now;
+  if (!V.open && wasOpen) { closedAt = now; speechEnd = lastLoud; }
   wasOpen = V.open;
 }
 
@@ -79,9 +79,9 @@ export function setScript(A){
     if (n) words.push({n, c0: t.c0, end: t.c0 + t.len, u0: t.u0, u1: t.u0 + t.dur});
   }
   avgW = words.length > 1 ? (words[words.length - 1].u1 - words[0].u0) / words.length : 2.8;
-  lastJ = -1; V.targetC = null; hits = []; utterStart = null;
+  lastJ = -1; lastFrac = 1; V.targetC = null; hits = []; utterStart = null;
 }
-let hits = [], hitLat = 0, avgW = 2.8, jumpId = 0, lastRun = 0;
+let hits = [], hitLat = 0, avgW = 2.8, jumpId = 0, lastRun = 0, lastFrac = 1, rateAtHit = null;
 function sim(a, b){
   if (a === b) return 1;
   if (!a || !b) return 0;
@@ -162,43 +162,63 @@ function align(transcript){
       }
     }
   }
-  if (best < 0 || best === lastJ) return;
-  if (LOG.on && LOG.hits.length < 3000) LOG.hits.push([lt(), best, rw.slice(-3).join(' '), +bestS.toFixed(2), jump ? 1 : 0]);
+  if (best < 0) return;
+  // tanınan son kelime yarımsa ("göğs" → "göğsünün") konum kelimenin içindedir
+  const lastRw = rw[rw.length - 1], full = words[best].n;
+  const frac = lastRw.length < full.length && full.startsWith(lastRw.slice(0, Math.min(lastRw.length, 4))) ? clampN(lastRw.length / full.length, 0.2, 1) : 1;
+  if (best === lastJ && frac <= lastFrac) return;
+  const posU = j => words[j].u0 + (words[j].u1 - words[j].u0) * (j === best ? frac : 1);
+  if (LOG.on && LOG.hits.length < 3000) LOG.hits.push([lt(), best, rw.slice(-3).join(' '), +bestS.toFixed(2), jump ? 1 : 0, +frac.toFixed(2)]);
   if (jump) { jumpId++; hits = []; }
-  // konuşma hızı: son birkaç saniyedeki ardışık tanımalardan (duraklar dahil), aykırı değerlere dayanıklı
-  hits.push({j: best, t: now}); hits = hits.filter(h => now - h.t < 7000).slice(-12);
+  // konuşma hızı: son ~3,5 sn'deki tanımalardan; yavaşlamaya daha hızlı uyar
+  hits.push({u: posU(best), t: now}); hits = hits.filter(h => now - h.t < 2200).slice(-12);
   const h0 = hits[0];
-  if (hits.length >= 4 && now - h0.t > 2500 && best > h0.j) {
-    const r = (words[best].u1 - words[h0.j].u1) / ((now - h0.t) / 1000);
-    if (r > 1.5 && r < 9) V.rate = clampN(V.rate ? V.rate * 0.75 + r * 0.25 : r, 2, 8);
+  if (hits.length >= 3 && now - h0.t > 800) {
+    const r = (posU(best) - h0.u) / ((now - h0.t) / 1000);
+    if (r > 1.2 && r < 10) { const w = V.rate && r < V.rate ? 0.6 : 0.4; V.rate = clampN(V.rate ? V.rate * (1 - w) + r * w : r, 2, 9); }
   }
-  // tanıma gecikmesi: konuşmaya başlama anı ile ilk kelimelerin tanınması arasındaki fark
+  // tanıma gecikmesi (1): konuşmaya başlama anı → ilk kelimelerin tanınması
   if (utterStart && best >= utterStart.j && best - utterStart.j <= 4 && utterStart.j < words.length) {
-    const spoken = (words[best].u1 - words[utterStart.j].u0) / rate;
-    const lat = (now - utterStart.t) / 1000 - spoken;
-    if (lat > 0.2 && lat < 2.5) V.lat = clampN(V.lat * 0.7 + lat * 0.3, 0.3, 2);
+    const lat = (now - utterStart.t) / 1000 - (posU(best) - words[utterStart.j].u0) / rate;
+    if (lat > 0.15 && lat < 2) V.lat = clampN(V.lat * 0.7 + lat * 0.3, 0.2, 1.4);
     utterStart = null;
   } else if (utterStart && now - utterStart.t > 4000) utterStart = null;
+  // tanıma gecikmesi (2): konuşma bittikten sonra gelen son tam kelime
+  if (!V.open && speechEnd && frac === 1 && now - speechEnd < 2500 && now > speechEnd) {
+    const lat = (now - speechEnd) / 1000;
+    if (lat > 0.15 && lat < 2) V.lat = clampN(V.lat * 0.7 + lat * 0.3, 0.2, 1.4);
+    speechEnd = 0;
+  }
   hitLat = V.open ? V.lat : Math.max(0, V.lat - (now - closedAt) / 1000 - S.g.gateHold);
   speakSinceHit = 0;
-  lastJ = best; lastRun = bestRun; V.targetC = words[best].end; V.lastHit = now;
+  rateAtHit = V.rate;
+  lastJ = best; lastRun = bestRun; lastFrac = frac; V.targetC = words[best].c0 + (words[best].end - words[best].c0) * frac; V.lastHit = now;
 }
 /* Okuduğun yerin tahmini: tanınan kelime + (gecikme + o andan beri konuşulan süre) × hızın, üstüne "öne alma" kadar kelime.
    Tanıma uzun süre yeni kelime vermezse tahmin en fazla ~1,5 sn ileri gider (kaçmayı önler). Dönüş: harf konumu. */
 export function estimate(){
   if (lastJ < 0 || !words.length) return null;
-  const rate = clampN(V.rate || S.g.sps, 2, 8);
+  const now = performance.now();
+  const rate = clampN(V.rate || S.g.sps, 2, 9);
   const auto = S.g.followAuto !== false;
-  const adv = auto ? Math.min(hitLat + Math.min(speakSinceHit, 1.5), 2.6) * rate : 0;
-  let u = words[lastJ].u1 + adv, j = lastJ + 1;
+  const gap = avgW / rate;                                   // bir kelimenin ortalama süresi (sn)
+  const gapHit = avgW / clampN(rateAtHit || rate, 2, 9);    // son tanımadaki hıza göre (metin dışı algısı için sabit)
+  const sinceHit = (now - V.lastHit) / 1000;
+  const quiet = Math.max(1.1, gapHit * 2.5);                    // bu kadar süre metindeki bir kelime tanınmazsa: metin dışı konuşma
+  const keep = clampN(1 - (sinceHit - quiet) / 0.5, 0, 1);
+  // yavaşladıysan (beklenenden uzun süredir yeni kelime yok) hızı o an düşür
+  if (sinceHit > gapHit * 2.0 && V.rate) V.rate = clampN(Math.min(V.rate, avgW / sinceHit * 1.3), 2, 9);
+  const adv = auto ? (hitLat + Math.min(speakSinceHit, gap * 1.1)) * rate * keep : 0;
+  const w0 = words[lastJ];
+  let u = w0.u0 + (w0.u1 - w0.u0) * lastFrac + adv, j = lastJ;
   while (j < words.length && words[j].u1 <= u) j++;
   let W;
   if (j >= words.length) W = words.length;
   else { const w = words[j]; W = j + clampN((u - w.u0) / Math.max(0.01, w.u1 - w.u0), 0, 1); }
-  W += S.g.followLead || 0;
+  W = Math.max(0, W + (S.g.followLead || 0));
   const k = Math.min(words.length - 1, Math.floor(W)), f = W >= words.length ? 1 : W - Math.floor(W);
   const w = words[k];
-  return {targetC: w.c0 + (w.end - w.c0) * f, rate, lat: V.lat, auto, jump: jumpId};
+  return {targetC: w.c0 + (w.end - w.c0) * f, rate, lat: V.lat, auto, jump: jumpId, offScript: keep < 1};
 }
 function makeRec(){
   const R = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -239,5 +259,5 @@ export async function setMode(mode, cGetter){
 }
 function stopRec(){ recWanted = false; if (rec) try { rec.abort(); } catch (e) {} }
 export function stopAll(){ V.on = false; V.open = false; V.mode = 'fixed'; stopRec(); stopMic(); V.targetC = null; }
-export function resetFollow(){ lastJ = -1; V.targetC = null; hits = []; utterStart = null; V.rate = null; }
+export function resetFollow(){ lastJ = -1; lastFrac = 1; V.targetC = null; hits = []; utterStart = null; V.rate = null; }
 export const micActive = () => !!analyser;

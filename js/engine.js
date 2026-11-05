@@ -544,12 +544,19 @@ export function tick(now, dt){
               if (P.jumpSeen != null) { seek(charToU(vf.targetC)); diff = 0; }
               P.jumpSeen = vf.jump;
             }
-            want = vf.open ? clamp(1 + diff / (fb * 0.9), 0, 2.2) : 0;
+            // gerideyken yumuşak yetiş, öndeyken sert fren: tahminin en fazla ~1 hece önüne geçer
+            want = !vf.open ? 0 : diff >= 0 ? clamp(1 + diff / (fb * 0.9), 1, 2.2) : clamp(1 + diff / 1.2, 0, 1);
           }
         }
-        const tau = want > P.gain ? 0.08 : 0.22;
+        const tau = want > P.gain ? 0.08 : (S.g.mode === 'follow' ? 0.12 : 0.22);
         P.gain += (want - P.gain) * (1 - Math.exp(-dt / tau));
         rate = fb * P.gain;
+        // sesle takip: okuyucu durduysa ve ekran 1 kelimeden fazla öndeyse yavaşça okunan yere geri kay
+        if (S.g.mode === 'follow' && vf && vf.targetC != null) {
+          const back = charToU(vf.targetC) - P.u;
+          if (back < -3.5) { P.backT = (P.backT || 0) + dt; if (P.backT > 0.6) rate = Math.max(-fb * 0.5, (back + 2) * 0.8); }
+          else P.backT = 0;
+        }
       }
     }
     P.rateNow = rate;

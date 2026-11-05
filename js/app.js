@@ -56,7 +56,7 @@ function flowCmd(action, extra = {}){
 function inputAction(a){
   if (a === 'faster' || a === 'slower') { const base = (LS && LS.sps) || S.g.sps; flowCmd('setSps', {value: clamp(Math.round((S.g.sps + (a === 'faster' ? 0.25 : -0.25)) * 100) / 100, 1.5, 10)}); return; }
   if (a === 'leadUp' || a === 'leadDown') {
-    const v = clamp(Math.round(((S.g.followLead || 0) + (a === 'leadUp' ? 0.5 : -0.5)) * 2) / 2, 0, 5);
+    const v = clamp(Math.round(((S.g.followLead || 0) + (a === 'leadUp' ? 0.5 : -0.5)) * 2) / 2, -2, 5);
     setG('followLead', v); const msg = `Sesle takip öne alma: ${num(v, 1)} kelime`; if (localStage()) E.toast(msg); else note(msg); return;
   }
   if (a === 'modeCycle') { const i = MODES.findIndex(x => x[0] === S.g.mode); const m = MODES[(i + 1) % MODES.length]; setG('mode', m[0]); if (localStage()) E.toast(m[1]); else note(m[1]); return; }
@@ -747,8 +747,8 @@ async function openEkranWindow(){
     }
   } catch (e) {}
   const u = new URL('index.html', location.href); u.searchParams.set('win', Math.random().toString(36).slice(2, 7));
-  const w = window.open(u.href, 'ggekran', feat);
-  if (!w) note('Tarayıcı açılır pencereyi engelledi; izin verin.', 4000);
+  window.open(u.href, 'ggekran', feat + ',noopener');
+  note('Ekran penceresi açıldı. Monitördeki pencerede “⛶ Tam ekran”a basın.', 5000);
 }
 
 /* ================= EKRAN ================= */

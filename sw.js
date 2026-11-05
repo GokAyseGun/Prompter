@@ -1,7 +1,7 @@
 /* GG Prompter — çevrimdışı önbellek.
    Uygulama dosyaları: önce ağ (güncellemeler hemen gelsin), ağ yoksa önbellek.
    Fontlar / kütüphaneler / simgeler: önce önbellek. Supabase istekleri önbelleğe alınmaz. */
-const VERSION = 'prompter-v3.3.0';
+const VERSION = 'prompter-v3.4.0';
 const SHELL = [
   './', 'index.html', 'kontrol.html', 'manifest.webmanifest',
   'css/app.css', 'css/fonts.css',
