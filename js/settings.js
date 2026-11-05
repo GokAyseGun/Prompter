@@ -42,7 +42,8 @@ export const DEF_PROFILE = {
 };
 export const DEF_SPS = 4.5;
 export const DEF_G = {
-  font:'inter', weight:500, italic:false, align:'left', textColor:'#ffffff', emphColor:'#f2c14e',
+  font:'inter', weight:500, italic:false, align:'left', textColor:'#ffffff', emphColor:'#f2c14e', markColor:'#e2aa2c', noteColor:'#a6dcf2',
+  lineOpacity:0.9, lineThick:0.05, spell:true,
   sps:DEF_SPS, personalSps:null, mode:'fixed',
   fadeWidth:6, readTone:0.45, readOpacity:0.6,
   pauseOn:true, pauseScale:1, lead:1, focusStrength:0.55,

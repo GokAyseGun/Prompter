@@ -57,6 +57,18 @@ export function yaziHTML(){
       <button type="button" data-v="#ff8a65"><i style="background:#ff8a65"></i>Turuncu</button>
       <button type="button" data-v="#7fd6ff"><i style="background:#7fd6ff"></i>Mavi</button>
       <label class="colorpick" title="Özel renk"><input type="color" data-gc="emphColor"></label></div></div>
+  <div class="field"><div class="fh"><span>Durak ‖, nefes / ve bölüm başlığı rengi</span></div>
+    <div class="seg colors" data-g="markColor">
+      <button type="button" data-v="#e2aa2c"><i style="background:#e2aa2c"></i>Hardal</button>
+      <button type="button" data-v="#8d99a7"><i style="background:#8d99a7"></i>Gri</button>
+      <button type="button" data-v="#ff8a65"><i style="background:#ff8a65"></i>Turuncu</button>
+      <label class="colorpick" title="Özel renk"><input type="color" data-gc="markColor"></label></div></div>
+  <div class="field"><div class="fh"><span>Not rengi (// not)</span></div>
+    <div class="seg colors" data-g="noteColor">
+      <button type="button" data-v="#a6dcf2"><i style="background:#a6dcf2"></i>Buz mavisi</button>
+      <button type="button" data-v="#8d99a7"><i style="background:#8d99a7"></i>Gri</button>
+      <button type="button" data-v="#9be7a8"><i style="background:#9be7a8"></i>Yeşil</button>
+      <label class="colorpick" title="Özel renk"><input type="color" data-gc="noteColor"></label></div></div>
   <p class="hint">Aşağıdakiler ekran tipine özgüdür:</p>
   ${R('size', 'data-p', 'Metin boyutu', 14, 200, 1)}
   ${R('lineHeight', 'data-p', 'Satır aralığı', 0.9, 2.6, 0.05)}
@@ -69,9 +81,9 @@ export function akisHTML(){
   ${SEG('mode', 'data-g', [['fixed','Sabit hız'],['gate','Ses kapısı'],['follow','Sesle takip']])}
   <p class="hint mode-hint"></p>
   <div class="follow-box">
-    <div class="fh" style="margin-bottom:0"><span><b style="color:var(--ice)">Sesle takip</b> <span class="follow-off muted">· yalnızca Sesle takip modunda etkilidir</span></span></div>
+    <div class="fh" style="margin-bottom:0"><span><b style="color:var(--ice)">Sesle takip</b></span></div>
     ${R('followLead', 'data-g', 'Öne alma (manuel)', -2, 5, 0.5)}
-    <p class="hint" style="margin-top:4px">Sistem okuduğun kelimeyi algılayıp dur-kalk ve hızlanma/yavaşlamayı ona göre yapar; ekranda okuma noktası (solma ve alt çizgi) bu kadar kelime önde gösterilir. Akış sırasında kumandadan veya E / Q tuşlarıyla değiştirilebilir.</p>
+    <p class="hint" style="margin-top:4px">Sistem okuduğun kelimeyi algılayıp dur-kalk ve hızlanma/yavaşlamayı ona göre yapar; ekranda okuma noktası (solma ve alt çizgi) bu kadar kelime önde gösterilir. Akış sırasında kumandadan, ← / → veya E / Q tuşlarıyla değiştirilebilir.</p>
     ${T('followAuto', 'data-g', 'Otomatik gecikme telafisi', 'Konuşma tanımanın gecikmesini ölçer ve okuduğun yeri o kadar ileri tahmin eder; akış senin gerçek okuma hızına uyar')}
     <p class="hint follow-info"></p>
   </div>
@@ -82,7 +94,9 @@ export function akisHTML(){
     ${R('gateHold', 'data-g', 'Susunca durma süresi', 0.3, 3, 0.1)}
     <p class="hint">Ses kapısı ve sesle takip kararlarını her zaman <b>Prompter cihazının</b> mikrofonu verir. Ekran ve Kumanda kendi seviyelerini yalnızca bilgi için gösterir.</p>
   </div>
-  <div class="field"><div class="fh"><label>Akış hızı</label><output data-o="sps"></output></div>
+  <div class="field speed-follow"><div class="fh"><label>Akış hızı</label><output class="live-rate">sesinden ölçülür</output></div>
+    <p class="hint" style="margin-top:0">Sesle takipte hız ayarı ve noktalama durakları kullanılmaz: akış hızını okuma hızın, durakları senin doğal duraklamaların belirler. Diğer modlara dönünce ayarların aynen geri gelir.</p></div>
+  <div class="field speed-field"><div class="fh"><label>Akış hızı</label><output data-o="sps"></output></div>
     <input type="range" data-g="sps" min="2" max="9" step="0.05">
     <p class="hint">Hız hece bazlıdır: “ve” 1 hece, “müteahhitlerden” 6 hece sürer. Önerilen 4–5 hece/sn.
       <button class="linkbtn reset-speed" type="button">Önerilen hıza dön</button> · <button class="linkbtn speed-test" type="button">Hızımı ölç</button><span class="personal"></span></p></div>
@@ -90,12 +104,16 @@ export function akisHTML(){
   ${R('readTone', 'data-g', 'Okunan yazının gri tonu', 0.1, 0.95, 0.01)}
   ${R('readOpacity', 'data-g', 'Okunan yazının solması (opaklık)', 0.15, 1, 0.01)}
   <div class="subhead">Okuma çizgisi</div>
+  <label class="tog"><input type="checkbox" data-showtog="uline"><span>Alt çizgi<small>Ekranda görünenler listesiyle bağlıdır</small></span></label>
+  <label class="tog"><input type="checkbox" data-showtog="arrows"><span>Oklar<small>Ekranda görünenler listesiyle bağlıdır</small></span></label>
+  ${R('lineOpacity', 'data-g', 'Çizgi ve ok opaklığı', 0.1, 1, 0.05)}
+  ${R('lineThick', 'data-g', 'Çizgi kalınlığı', 0.02, 0.16, 0.01)}
   ${R('lead', 'data-g', 'Alt satıra erken geçiş', 0, 3, 0.25)}
-  <p class="hint" style="margin-top:4px">Çizgi okunan satırın altında onunla birlikte çıkar; son heceye bu kadar kala alt satıra geçer. Çizgi, ok ve odak görünürlüğü Ekran ayarlarındadır.</p>
+  <p class="hint" style="margin-top:4px">Çizgi okunan satırın altında onunla birlikte çıkar; son heceye bu kadar kala alt satıra geçer.</p>
   ${R('focusStrength', 'data-g', 'Odak karartma gücü', 0.1, 0.95, 0.05)}
-  <div class="subhead">Noktalama duraklamaları</div>
-  ${T('pauseOn', 'data-g', 'Noktalamada dur', 'Virgülde kısa, noktada daha uzun, paragraf sonunda en uzun')}
-  <div class="pause-field">${R('pauseScale', 'data-g', 'Durak uzunluğu', 0.25, 3, 0.05)}<p class="hint pause-hint"></p></div>
+  <div class="pause-sec"><div class="subhead">Noktalama duraklamaları</div>
+  ${T('pauseOn', 'data-g', 'Noktalamada dur', 'Virgülde kısa, noktada daha uzun, paragraf sonunda en uzun; [DUR] durakları da uygulanır')}
+  <div class="pause-field">${R('pauseScale', 'data-g', 'Durak uzunluğu', 0.25, 3, 0.05)}<p class="hint pause-hint"></p></div></div>
   <div class="subhead">Ekler</div>
   ${T('countdown', 'data-g', '3-2-1 geri sayım')}
   ${T('fullscreen', 'data-g', 'Tam ekran aç', 'Ekran kilidi de otomatik engellenir')}
@@ -121,7 +139,7 @@ const FMT = {
   sps: v => speedText(v, avgSylFn()), fadeWidth: v => Math.round(v) + ' harf',
   readTone: v => '%' + Math.round(v * 100), readOpacity: v => '%' + Math.round(v * 100),
   pauseScale: v => '×' + num(v, 2), lead: v => num(v, 2) + ' hece', focusStrength: v => '%' + Math.round(v * 100),
-  boostMul: v => '×' + num(v, 1), followLead: v => (v > 0 ? '+' : '') + num(v, 1) + ' kelime', gateDb: v => Math.round(v) + ' dB', gateHold: v => num(v, 1) + ' sn',
+  boostMul: v => '×' + num(v, 1), lineOpacity: v => '%' + Math.round(v * 100), lineThick: v => '%' + Math.round(v * 100) + ' (yazı boyutuna göre)', followLead: v => (v > 0 ? '+' : '') + num(v, 1) + ' kelime', gateDb: v => Math.round(v) + ' dB', gateHold: v => num(v, 1) + ' sn',
 };
 
 /* ctx: { type(): profil tipi, setType?(t): ekran tipini değiştir, onSpeedTest?() } */
@@ -145,7 +163,7 @@ export function bindForm(root, ctx){
       const cp = seg.querySelector('.colorpick'); if (cp) cp.classList.toggle('on', !seg.querySelector('button.on'));
     }
     for (const b of root.querySelectorAll('[data-ptype] button')) b.classList.toggle('on', b.dataset.v === type());
-    for (const b of root.querySelectorAll('[data-show]')) b.classList.toggle('on', !!pr.show[b.dataset.show]);
+    for (const b of root.querySelectorAll('button[data-show]')) b.classList.toggle('on', !!pr.show[b.dataset.show]);
     for (const o of root.querySelectorAll('output[data-o]')) {
       const k = o.dataset.o, v = (k in S.g) ? S.g[k] : pr[k];
       o.textContent = FMT[k] ? FMT[k](+v) : v;
@@ -154,7 +172,12 @@ export function bindForm(root, ctx){
     if (q('.rot-field')) q('.rot-field').hidden = pr.orientation === 'auto';
     if (q('.pause-field')) q('.pause-field').classList.toggle('off', !S.g.pauseOn);
     if (q('.voice-box')) q('.voice-box').hidden = S.g.mode === 'fixed';
-    if (q('.follow-off')) q('.follow-off').hidden = S.g.mode === 'follow';
+    const fol = S.g.mode === 'follow';
+    if (q('.follow-box')) q('.follow-box').hidden = !fol;
+    if (q('.speed-field')) q('.speed-field').hidden = fol;
+    if (q('.speed-follow')) q('.speed-follow').hidden = !fol;
+    if (q('.pause-sec')) q('.pause-sec').hidden = fol;
+    for (const c of root.querySelectorAll('[data-showtog]')) c.checked = !!pr.show[c.dataset.showtog];
     if (q('.mode-hint')) q('.mode-hint').textContent = MODE_HINT[S.g.mode];
     if (q('.pause-hint')) { const k = S.g.pauseScale / S.g.sps; q('.pause-hint').textContent = `Bu hızda: virgül ≈ ${num(P_COMMA * k)} sn · nokta ≈ ${num(P_STOP * k)} sn · paragraf sonu ≈ ${num(P_PARA * k)} sn`; }
     if (q('.personal')) q('.personal').textContent = S.g.personalSps ? ` · Ölçülen hızınız: ${num(S.g.personalSps)} hece/sn` : '';
@@ -175,6 +198,7 @@ export function bindForm(root, ctx){
     });
   }
   for (const el of root.querySelectorAll('input[data-gc]')) el.addEventListener('input', () => setG(el.dataset.gc, el.value));
+  for (const el of root.querySelectorAll('input[data-showtog]')) el.addEventListener('change', () => setShow(type(), el.dataset.showtog, el.checked));
   for (const seg of root.querySelectorAll('.seg[data-g], .seg[data-p]')) {
     seg.addEventListener('click', e => {
       const b = e.target.closest('button[data-v]'); if (!b) return;
@@ -185,7 +209,7 @@ export function bindForm(root, ctx){
   }
   root.addEventListener('click', e => {
     const pt = e.target.closest('[data-ptype] button'); if (pt && ctx.setType) { ctx.setType(pt.dataset.v); sync(); return; }
-    const sh = e.target.closest('[data-show]'); if (sh) { setShow(type(), sh.dataset.show, !prof(type()).show[sh.dataset.show]); return; }
+    const sh = e.target.closest('button[data-show]'); if (sh) { setShow(type(), sh.dataset.show, !prof(type()).show[sh.dataset.show]); return; }
     if (e.target.closest('.reset-prof')) { resetProfile(type()); note('Ekran tipi varsayılana döndü.'); return; }
     if (e.target.closest('.reset-speed')) { setG('sps', S.g.personalSps || DEF_SPS); return; }
     if (e.target.closest('.speed-test')) { ctx.onSpeedTest && ctx.onSpeedTest(); return; }

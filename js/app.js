@@ -54,6 +54,7 @@ function flowCmd(action, extra = {}){
   if (action === 'toggle' || action === 'play') requestStart(false);
 }
 function inputAction(a){
+  if (S.g.mode === 'follow' && (a === 'faster' || a === 'slower')) a = a === 'faster' ? 'leadUp' : 'leadDown';   // sesle takipte ←/→ öne alma
   if (a === 'faster' || a === 'slower') { const base = (LS && LS.sps) || S.g.sps; flowCmd('setSps', {value: clamp(Math.round((S.g.sps + (a === 'faster' ? 0.25 : -0.25)) * 100) / 100, 1.5, 10)}); return; }
   if (a === 'leadUp' || a === 'leadDown') {
     const v = clamp(Math.round(((S.g.followLead || 0) + (a === 'leadUp' ? 0.5 : -0.5)) * 2) / 2, -2, 5);
@@ -297,7 +298,7 @@ function renderMini(box, body, mirrored){
     parts.push(`<div class="para${p.type === 'h' ? ' hd' : p.type === 'n' ? ' nt' : ''}">${toks.join(' ')}</div>`);
   });
   box.innerHTML = `<div class="m-mir"><div class="m-area" style="top:${top}px;bottom:${bot}px;left:${side}px;right:${side}px">
-    <div class="m-content" style="font-size:${fs}px;padding:${fs * 0.35}px ${pad}px;font-family:${fontOf(g.font).fam.replace(/"/g, "'")},sans-serif;font-weight:${g.weight};font-style:${g.italic ? 'italic' : 'normal'};line-height:${pr.lineHeight};letter-spacing:${pr.letter}em;text-align:${g.align};color:${g.textColor};--em:${g.emphColor}">${parts.join('')}</div>
+    <div class="m-content" style="font-size:${fs}px;padding:${fs * 0.35}px ${pad}px;font-family:${fontOf(g.font).fam.replace(/"/g, "'")},sans-serif;font-weight:${g.weight};font-style:${g.italic ? 'italic' : 'normal'};line-height:${pr.lineHeight};letter-spacing:${pr.letter}em;text-align:${g.align};color:${g.textColor};--em:${g.emphColor};--mk:${g.markColor};--nt:${g.noteColor}">${parts.join('')}</div>
     <div class="m-ft"></div><div class="m-fb"></div><div class="m-ul"></div><div class="m-ar l"></div><div class="m-ar r"></div></div></div>`;
   const content = box.querySelector('.m-content'), area = box.querySelector('.m-area');
   const spans = [...content.querySelectorAll('.tk')];
@@ -316,13 +317,13 @@ function renderMini(box, body, mirrored){
   const base = [hexRgb(g.textColor), hexRgb(g.emphColor)], tone = Math.round(255 * g.readTone);
   for (const c of content.querySelectorAll('[data-c]')) {
     const q = clamp((headC - +c.dataset.c) / g.fadeWidth, 0, 1); if (q <= 0) continue;
-    const b = c.classList.contains('em') ? base[1] : c.closest('.hd') ? [226, 170, 44] : c.closest('.nt') ? [166, 220, 242] : base[0];
+    const b = c.classList.contains('em') ? base[1] : (c.closest('.hd') || c.closest('.hold') || c.closest('.br')) ? hexRgb(g.markColor) : c.closest('.nt') ? hexRgb(g.noteColor) : base[0];
     c.style.color = `rgb(${b.map(x => Math.round(x + (tone - x) * q)).join(',')})`; c.style.opacity = (1 + (g.readOpacity - 1) * q).toFixed(3);
   }
   const ul = box.querySelector('.m-ul');
   ul.hidden = !sh.uline;
-  ul.style.cssText += `;left:${L.left - fs * 0.06}px;width:${L.right - L.left + fs * 0.12}px;top:${L.top + L.h + fs * 0.03 - shift}px;height:${Math.max(1.5, fs * 0.05)}px`;
-  for (const a of box.querySelectorAll('.m-ar')) { a.hidden = !sh.arrows; a.style.top = (L.top + L.h / 2 - shift) + 'px'; a.style.borderWidth = Math.max(4, fs * 0.22) + 'px'; }
+  ul.style.cssText += `;left:${L.left - fs * 0.06}px;width:${L.right - L.left + fs * 0.12}px;top:${L.top + L.h + fs * 0.03 - shift}px;height:${Math.max(1, fs * g.lineThick)}px;opacity:${g.lineOpacity}`;
+  for (const a of box.querySelectorAll('.m-ar')) { a.hidden = !sh.arrows; a.style.top = (L.top + L.h / 2 - shift) + 'px'; a.style.borderWidth = Math.max(4, fs * 0.22) + 'px'; a.style.opacity = g.lineOpacity; }
   const lh = lines[1] ? lines[1].top - lines[0].top : fs * 1.3, k = g.focusStrength;
   const ft = box.querySelector('.m-ft'), fb = box.querySelector('.m-fb');
   ft.hidden = fb.hidden = !sh.focus;
@@ -687,6 +688,8 @@ function mountPrompter(){
   try { const q = window.qrcode(0, 'M'); q.addData(ctlURL()); q.make(); $('#qr').innerHTML = q.createSvgTag({cellSize: 4, margin: 2, scalable: true}); } catch (e) {}
   $('#copyLink').addEventListener('click', () => navigator.clipboard.writeText(ctlURL()).then(() => note('Bağlantı kopyalandı.'), () => note(ctlURL(), 6000)));
   $('#ekWinBtn').addEventListener('click', openEkranWindow);
+  ta.spellcheck = S.g.spell !== false; $('#spellTog').checked = ta.spellcheck;
+  $('#spellTog').addEventListener('change', e => { setG('spell', e.target.checked); ta.spellcheck = e.target.checked; ta.blur(); ta.focus(); });
 
   /* canlı izleme */
   const liveR = mountRemote($('#liveRemote'), {cmd: (a, x) => flowCmd(a, x), setMode: m => setG('mode', m), lead: d => inputAction(d > 0 ? 'leadUp' : 'leadDown')});
@@ -921,6 +924,7 @@ function frame(now){
   sendVoice(now);
   tickMeters(() => V.level);
   if (now - lastFI > 500) { lastFI = now; const src = V.on ? {lat: V.lat, rate: V.rate} : (now - VR.at < 1500 ? {lat: VR.lat, rate: VR.rate} : null);
+    for (const el of $$('.live-rate')) el.textContent = src && src.rate ? `sesinden: ${num(src.rate)} hece/sn` : 'sesinden ölçülür';
     for (const el of $$('.follow-info')) el.textContent = src && src.lat != null ? `Ölçülen tanıma gecikmesi ≈ ${num(src.lat, 1)} sn${src.rate ? ` · okuma hızınız ≈ ${num(src.rate)} hece/sn` : ''}` : 'Ölçüm, sesle takip sırasında Prompter cihazında yapılır.'; }
   if (now - lastRec > 500) { lastRec = now; reconcileVoice(); }
   if (V.on && V.mode === 'follow' && flowActive()) {
@@ -986,12 +990,13 @@ async function main(){
   });
   setCfgSender(patch => LINK.send('cfg', {patch}));
   // yalnızca gerekince yeniden kur: görünürlük/duraklar → metni yeniden diz; görünüm → stili yenile
-  const sigBuild = () => JSON.stringify([DEV.profile, prof().show, S.g.pauseOn, S.g.pauseScale]);
-  const sigLook = () => JSON.stringify([prof(), S.g.font, S.g.weight, S.g.italic, S.g.align, S.g.textColor, S.g.emphColor, S.g.readTone, S.g.readOpacity, S.g.focusStrength]);
+  const sigBuild = () => JSON.stringify([DEV.profile, prof().show, S.g.pauseOn, S.g.pauseScale, S.g.mode === 'follow']);
+  const sigLook = () => JSON.stringify([prof(), S.g.font, S.g.weight, S.g.italic, S.g.align, S.g.textColor, S.g.emphColor, S.g.markColor, S.g.noteColor, S.g.lineOpacity, S.g.lineThick, S.g.readTone, S.g.readOpacity, S.g.focusStrength]);
   let lastB = sigBuild(), lastL = sigLook();
   onSettings(() => {
     const b = sigBuild(), l = sigLook();
     if (E.P.on && (b !== lastB || l !== lastL)) E.restyle(b !== lastB);
+    if (b !== lastB && flowActive()) voiceSetScript(analyze(localStage() ? E.P.body : (CUR.s ? CUR.s.body : ''), S.g));
     lastB = b; lastL = l;
     VIEW.settingsChanged && VIEW.settingsChanged();
   });

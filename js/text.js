@@ -35,7 +35,8 @@ function splitChars(raw, state){
 /* tokens: {kind:'w'|'b'|'hold', type:'p'|'h'|'n', chars:[{ch,e}], u0, dur, pause, c0, len, src, syl, para}
    paras:  {type:'p'|'h'|'n'|'gap', tokens:[idx]} */
 export function analyze(text, o = {}){
-  const pf = o.pauseOn === false ? 0 : (o.pauseScale ?? 1);
+  const follow = o.mode === 'follow';
+  const pf = follow || o.pauseOn === false ? 0 : (o.pauseScale ?? 1);
   const src = String(text || '').replace(/\r\n?/g, '\n');
   const tokens = [], paras = [], holds = [], sections = [];
   let u = 0, c = 0, sylSum = 0, wc = 0, holdSec = 0, off = 0;
@@ -54,7 +55,7 @@ export function analyze(text, o = {}){
         t.kind = 'hold'; t.sec = m[1] ? parseFloat(m[1].replace(',', '.')) : 1;
         t.chars = [{ch: '‖', e: false}];
       } else if (raw === '/' && type === 'p') {
-        t.kind = 'b'; t.chars = [{ch: '/', e: false}]; t.pause = P_BREATH;
+        t.kind = 'b'; t.chars = [{ch: '/', e: false}]; t.pause = follow ? 0 : P_BREATH;
       } else {
         t.kind = 'w'; t.chars = splitChars(raw, state);
         if (!t.chars.length) continue;

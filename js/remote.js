@@ -52,6 +52,8 @@ export function mountRemote(root, api){
     if (b) {
       buzz();
       const a = b.dataset.a;
+      const fol = st && st.mode === 'follow';
+      if (fol && (a === 'faster' || a === 'slower')) { api.lead && api.lead(a === 'faster' ? 1 : -1); return; }
       if (a === 'faster') sendSps(curSps() + 0.25);
       else if (a === 'slower') sendSps(curSps() - 0.25);
       else api.cmd(a);
@@ -118,12 +120,19 @@ export function mountRemote(root, api){
         const secs = s.sections || [], key = secs.join('\u0001'), box = q('.rm-sections');
         if (box.dataset.k !== key) { box.dataset.k = key; box.innerHTML = secs.map((t, i) => `<button type="button" data-sec="${i}">${esc(t)}</button>`).join(''); }
       }
-      if (s && s.sps) {
+      const mode = (s && s.mode) || meta.mode;
+      const fol = mode === 'follow';
+      q('.rm-spsr').hidden = fol;
+      q('.left').title = fol ? 'Takip geri al' : 'Hız azalt'; q('.right').title = fol ? 'Takip öne al' : 'Hız artır';
+      if (fol) {
+        const r = s && s.onStage && s.rate > 0.1 ? s.rate : null;
+        q('.rm-sps').textContent = r ? num(r) + ' hece/sn' : 'sesinden';
+        q('.rm-wpm').textContent = 'hız okuma hızından ölçülür · −/+ öne alma';
+      } else if (s && s.sps) {
         q('.rm-sps').textContent = num(s.sps) + ' hece/sn';
         q('.rm-wpm').textContent = Math.round(s.sps * 60 / (s.avgSyl || 2.8)) + ' kelime/dk';
         if (document.activeElement !== q('.rm-spsr')) q('.rm-spsr').value = s.sps;
       }
-      const mode = (s && s.mode) || meta.mode;
       for (const b of root.querySelectorAll('.rm-mode button')) b.classList.toggle('on', b.dataset.v === mode);
       const lb = q('.rm-lead'); lb.hidden = mode !== 'follow';
       if (!lb.hidden && meta.followLead != null) q('.rm-leadv').textContent = num(meta.followLead, 1) + ' kelime';

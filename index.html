@@ -29,6 +29,7 @@
     <span class="badge" id="linkBadge" title="Cihaz bağlantısı"><i></i><span>—</span></span>
     <span class="badge" id="padBadge"><i></i><span>Kontrolcü yok</span></span>
     <button class="btn ghost sm" id="takesBtn" data-only="prompter" type="button">Çekimler</button>
+    <button class="btn ghost sm" id="ekWinBtn" data-only="prompter" type="button" title="Bu bilgisayara bağlı harici monitörde Ekran penceresi açar">⧉ Harici monitör</button>
     <div class="roles" id="roleSw" role="group" aria-label="Bu cihazın rolü"></div>
     <button class="btn ghost sm" id="logoutBtn" type="button" title="Çıkış yap">Çıkış</button>
   </div>
@@ -72,9 +73,10 @@
           <button class="btn sm ghost" id="helpBtn" type="button" title="İşaretler nasıl kullanılır">?</button>
         </div>
       </div>
-      <textarea id="ta" spellcheck="false" placeholder="Okunacak metni buraya yazın veya yapıştırın…"></textarea>
+      <textarea id="ta" spellcheck="true" lang="tr" autocapitalize="sentences" placeholder="Okunacak metni buraya yazın veya yapıştırın…"></textarea>
       <div class="meta"><span id="meta">0 kelime</span><span id="saveState"></span></div>
       <label class="tog small"><input type="checkbox" id="autoClean"><span>Yapıştırınca biçimi otomatik düzelt</span></label>
+      <label class="tog small"><input type="checkbox" id="spellTog"><span>Türkçe yazım denetimi<small>Hatalı veya eksik yazılmış kelimelerin altı kırmızı çizilir. Çizgi görünmüyorsa Chrome Ayarlar → Diller → Yazım denetimi'nde Türkçe'yi açın.</small></span></label>
       <div class="target-row">
         <label for="targetIn">Hedef süre</label>
         <input id="targetIn" type="text" inputmode="numeric" placeholder="dk:sn" maxlength="8" autocomplete="off">
@@ -114,9 +116,7 @@
               <div class="actions"><button class="btn sm" id="copyLink" type="button">Bağlantıyı kopyala</button></div>
             </div>
           </div>
-          <div class="subhead">Harici monitör</div>
-          <p class="hint" style="margin-top:0">Bu bilgisayara bağlı monitörde ayrı bir Ekran penceresi açar. Chrome izin isterse “İzin ver” deyin; pencere doğrudan diğer ekranda açılır.</p>
-          <button class="btn" id="ekWinBtn" type="button">⧉ Ekran penceresi aç</button>
+          <p class="hint">Bu bilgisayara bağlı harici monitör için üst çubuktaki <b>⧉ Harici monitör</b> düğmesini kullanın.</p>
         </div>
         <div>
           <div class="fh"><span>Bağlı cihazlar ve rolleri</span></div>

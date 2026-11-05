@@ -7,7 +7,6 @@ import { S, DEV, prof, fontOf, MODES, setG } from './settings.js';
 import { analyze, speedText } from './text.js';
 
 const el = {};
-const NOTE_RGB = [166, 220, 242], HEAD_RGB = [226, 170, 44], CUE_RGB = [127, 138, 150];
 export const P = {
   on:false, cal:false, A:null, chars:[], cls:null, applied:null, tokEls:[], lines:[], knots:[], KI:[], win:1, total:0, u:0,
   playing:false, ended:false, counting:false, countEnd:0, holdIdx:0, holdLeft:0,
@@ -87,7 +86,9 @@ function applyStyle(){
   el.content.style.setProperty('--em', g.emphColor);
   el.mir.style.transform = `scale(${pr.mirror === 'h' ? -1 : 1},${pr.flipV ? -1 : 1})`;
   P.tone = Math.round(255 * g.readTone);
-  P.base = [hexRgb(g.textColor), hexRgb(g.emphColor), NOTE_RGB, HEAD_RGB, CUE_RGB];
+  P.base = [hexRgb(g.textColor), hexRgb(g.emphColor), hexRgb(g.noteColor), hexRgb(g.markColor), hexRgb(g.markColor)];
+  el.content.style.setProperty('--mk', g.markColor); el.content.style.setProperty('--nt', g.noteColor);
+  el.uline.style.opacity = el.arL.style.opacity = el.arR.style.opacity = g.lineOpacity;
   el.uline.hidden = !sh.uline;
   el.arL.hidden = el.arR.hidden = !sh.arrows;
   el.fTop.hidden = el.fBot.hidden = !sh.focus;
@@ -120,7 +121,7 @@ function layout(){
   const ar = Math.max(10, Math.round(fs * 0.22));
   for (const a of [el.arL, el.arR]) { a.style.borderTopWidth = a.style.borderBottomWidth = ar + 'px'; }
   el.arL.style.borderLeftWidth = el.arR.style.borderRightWidth = Math.round(ar * 1.3) + 'px';
-  el.uline.style.height = Math.max(2, Math.round(fs * 0.05)) + 'px';
+  el.uline.style.height = Math.max(1, Math.round(fs * S.g.lineThick)) + 'px';
   const small = Math.max(13, Math.round(Math.min(fs * 0.3, P.H * 0.034)));
   el.clock.style.fontSize = small + 'px'; el.vind.style.fontSize = Math.round(small * 0.8) + 'px';
   measure();
@@ -569,7 +570,7 @@ export function tick(now, dt){
     let nu = P.u + rate * dt;
     if (rate > 0 && !P.boost) {
       const Hs = P.A.holds;
-      if (P.lead && P.holdIdx < Hs.length && nu >= Hs[P.holdIdx].u) { nu = Hs[P.holdIdx].u; P.holdLeft = Hs[P.holdIdx].sec; P.holdIdx++; }
+      if (P.lead && S.g.mode !== 'follow' && P.holdIdx < Hs.length && nu >= Hs[P.holdIdx].u) { nu = Hs[P.holdIdx].u; P.holdLeft = Hs[P.holdIdx].sec; P.holdIdx++; }
     } else if (rate < 0) { const Hs = P.A.holds; while (P.holdIdx > 0 && Hs[P.holdIdx - 1].u > nu) P.holdIdx--; }
     P.u = clamp(nu, 0, P.total);
     if (rate > 0.05 * base) P.activeSec += dt;

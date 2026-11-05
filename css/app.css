@@ -428,3 +428,7 @@ select.txt{appearance:auto}
 .follow-box .field:first-child{margin-top:0}
 #ctl .info.leadbtn{padding:0 4px;font-size:11px;line-height:1.1}
 #ctl .info.leadbtn b{font-size:15px}
+.para.hd{color:var(--mk,#e2aa2c)}
+.para.nt{color:var(--nt,#a6dcf2)}
+.tk.hold,.tk.br{color:var(--mk,#7f8a96)}
+.k-doc .para.hd,.pv .para.hd{color:#e2aa2c}
