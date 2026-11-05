@@ -21,6 +21,9 @@ Bir cihaz Prompter olunca önceki Prompter Kumanda'ya geçer. Ekran yoksa Prompt
 - Klavye / fare / PS kontrolcü tuş atama, analog çubukla hız veya sarma, basılı tutunca hızlı ileri/geri
 - Ayarlar hesapla tüm cihazlarda eşitlenir; PWA olarak kurulur, çevrimdışı açılır
 
+## Bağlantı
+Cihazlar **aynı WiFi** ağında olmalıdır. Akış, kumanda, ses, ayar ve metin trafiği WebRTC veri kanallarıyla doğrudan cihazdan cihaza gider (ICE sunucusu yok → yalnızca yerel ağ). Supabase yalnızca giriş, kayıt ve cihazların ilk tanışması (presence + el sıkışma) için kullanılır; WiFi bağlantısı kurulduktan sonra internet kopsa da akış sürer.
+
 ## Altyapı
 Supabase “Gün Teknik” projesi, ERP'den ayrı **`prompter`** şeması (tablolar `scripts`, `script_versions`, `settings`, `takes`; satır bazlı erişim yalnızca sahibine).
 Anlık kumanda: Supabase Realtime özel kanal `prompter:<kullanıcı-id>`. Oturum ERP'den ayrı anahtarda (`prompter-auth`) tutulur.

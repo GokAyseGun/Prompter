@@ -418,3 +418,6 @@ select.txt{appearance:auto}
 .rm.idle .rm-row,.rm.idle .rm-sections{opacity:.45}
 .live .rm-pad{height:150px}
 .live .rm-dpad{width:220px}
+
+.devlist li.off{opacity:.65;border-style:dashed}
+.devlist li.off small{color:var(--err)}

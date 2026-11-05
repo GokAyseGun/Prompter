@@ -190,9 +190,10 @@ function renderRoleSw(el){
 }
 function setLinkBadge(){
   const b = $('#linkBadge'); if (!b) return;
-  const ok = LINK && LINK.ready, n = PEERS.length;
-  b.className = 'badge ' + (ok ? 'on' : 'err');
-  b.querySelector('span').textContent = ok ? (n ? `${n} cihaz bağlı` : 'Bağlı · tek cihaz') : 'Bağlantı yok';
+  const n = PEERS.length, waiting = LINK ? LINK.seen.filter(x => !PEERS.some(p => p.deviceId === x.deviceId)).length : 0;
+  b.className = 'badge ' + (n ? 'on' : waiting ? 'err' : '');
+  b.querySelector('span').textContent = n ? `WiFi · ${n} cihaz` + (waiting ? ` · ${waiting} bağlanamadı` : '') : waiting ? 'WiFi bağlantısı yok' : 'Tek cihaz';
+  b.title = 'Cihazlar arası tüm iletişim aynı WiFi üzerinden doğrudan yapılır.';
 }
 function updatePadBadge(){
   const pads = getPads(), el = $('#padBadge');
@@ -204,17 +205,24 @@ function updatePadBadge(){
 function renderDevList(el){
   if (!el) return;
   const me = {deviceId: DEV.id, name: DEV.name, role: DEV.role, profile: DEV.profile, onStage: localStage(), me: true};
-  const all = [me, ...PEERS];
-  el.innerHTML = all.map(p => `<li><i class="dotc ${p.role}"></i><div class="dv-main"><b>${esc(p.name || 'Cihaz')}${p.me ? ' <span class="muted">(bu cihaz)</span>' : ''}</b>
-      <small>${PNAME[p.profile] || ''}${p.onStage ? ' · akışta' : ''}</small></div>
-      <select class="txt dv-role" data-dev="${p.deviceId}">${ROLES.map(([r, n]) => `<option value="${r}"${p.role === r ? ' selected' : ''}>${n}</option>`).join('')}</select></li>`).join('');
+  const conn = new Set(PEERS.map(p => p.deviceId));
+  const others = LINK ? LINK.seen.filter(x => !conn.has(x.deviceId)).map(x => ({...x, off: true})) : [];
+  const all = [me, ...PEERS, ...others];
+  const st = p => {
+    if (p.me) return 'bu cihaz';
+    if (!p.off) { const r = LINK.info(p.deviceId).rtt; return `WiFi ✓${r != null ? ' · ' + r + ' ms' : ''}`; }
+    return LINK.info(p.deviceId).state === 'connecting' ? 'WiFi ile bağlanıyor…' : '⚠ Aynı WiFi’de değil';
+  };
+  el.innerHTML = all.map(p => `<li class="${p.off ? 'off' : ''}"><i class="dotc ${p.role}"></i><div class="dv-main"><b>${esc(p.name || 'Cihaz')}</b>
+      <small>${st(p)}${PNAME[p.profile] ? ' · ' + PNAME[p.profile] : ''}${p.onStage ? ' · akışta' : ''}</small></div>
+      <select class="txt dv-role" data-dev="${p.deviceId}"${p.off ? ' disabled' : ''}>${ROLES.map(([r, n]) => `<option value="${r}"${p.role === r ? ' selected' : ''}>${n}</option>`).join('')}</select></li>`).join('');
   el.onchange = e => {
     const s = e.target.closest('.dv-role'); if (!s) return;
     if (s.dataset.dev === DEV.id) setRole(s.value, false);
     else { LINK.cmd(s.dataset.dev, 'setRole', {role: s.value}); note('Rol gönderildi.'); }
   };
 }
-
+setInterval(() => { renderDevList($('#devList')); renderDevList($('#kmDevList')); }, 3000);
 /* Ayarlanan ekran seçimi (Ekran / Yazı / Önizleme formları için) */
 const TGT = {id: null, type: DEV.profile};
 const DIMS = {phone: [844, 390], tablet: [1180, 820], desktop: [1440, 900], monitor: [1920, 1080]};
@@ -623,6 +631,8 @@ function startFlow(resume){
   persist();
   const payload = {body: CUR.s.body, scriptId: CUR.s.id, title: CUR.s.title || 'Adsız metin', targetSec: CUR.s.target_sec, startChar: resume ? CUR.s.last_char : 0};
   voiceSetScript(analyze(CUR.s.body, S.g));
+  const offEk = LINK ? LINK.seen.filter(x => x.role === 'ekran' && !PEERS.some(p => p.deviceId === x.deviceId)) : [];
+  if (offEk.length) note(`${offEk.map(x => x.name).join(', ')} aynı WiFi'de değil; akışa katılamaz.`, 5000);
   const eks = ekranPeers().map(p => p.deviceId).sort();
   if (eks.length && LINK && LINK.ready) {
     const stageAt = Date.now();
@@ -950,7 +960,7 @@ async function main(){
     user: USER, deviceId: DEV.id, meta: {role: DEV.role || 'kumanda', name: DEV.name, profile: DEV.profile, onStage: false, w: innerWidth, h: innerHeight},
     on: ON,
     onPresence: peers => {
-      PEERS = peers; refreshLead(); setLinkBadge(); if (peers.length && firstSync) firstSync();
+      PEERS = peers; refreshLead(); setLinkBadge(); if ((peers.length || LINK.seen.length) && firstSync) setTimeout(firstSync, 400);
       if (DEV.role === 'prompter' && DEV.roleAuto && peers.some(p => p.role === 'prompter')) { setRole('kumanda', true); return; }
       if (DEV.role) { VIEW.peersChanged && VIEW.peersChanged(); if (LEAD && !PEERS.some(p => p.deviceId === LEAD) && LEAD !== DEV.id) { LEAD = null; refreshLead(); } }
     },
@@ -968,8 +978,9 @@ async function main(){
     VIEW.settingsChanged && VIEW.settingsChanged();
   });
   await Promise.race([synced, new Promise(r => setTimeout(r, 1800))]);
-  if (!DEV.role) { DEV.role = prompterPeer() ? 'kumanda' : 'prompter'; DEV.roleAuto = true; saveDevice(); }
-  if (DEV.role === 'prompter' && prompterPeer() && DEV.roleAuto) { DEV.role = 'kumanda'; saveDevice(); }
+  const otherPrompter = () => prompterPeer() || LINK.seen.find(p => p.role === 'prompter');
+  if (!DEV.role) { DEV.role = otherPrompter() ? 'kumanda' : 'prompter'; DEV.roleAuto = true; saveDevice(); }
+  if (DEV.role === 'prompter' && otherPrompter() && DEV.roleAuto) { DEV.role = 'kumanda'; saveDevice(); }
   if (DEV.role === 'prompter' && !DEV.roleAuto) LINK.send('role', {role: 'prompter'});
   document.body.dataset.role = DEV.role;
   document.title = `GG Prompter · ${ROLE_NAME[DEV.role]}`;
