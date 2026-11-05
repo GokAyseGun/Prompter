@@ -1,9 +1,14 @@
-# Aynalı Prompter
+# GG Prompter
 
-Gün Teknik için aynalı prompter uygulaması. Adres: **https://gokaysegun.github.io/Prompter/**
+Aynalı prompter uygulaması. Adres: **https://gokaysegun.github.io/Prompter/**
 
-- `index.html`: metin, ayarlar ve prompter ekranı
-- `kontrol.html`: telefondan kumanda ve operatör paneli (canlı metin, dokunarak atlama, canlı düzenleme)
+Tek uygulama, üç rol (sağ üstten seçilir; Cihazlar bölümünden uzaktan da atanır):
+- **Prompter**: metin, kütüphane, tüm ayarlar, başlatma ve canlı izleme. Ses kapısı / sesle takip kararını bu cihazın mikrofonu verir.
+- **Ekran**: camın altındaki aynalı görüntü. Beklerken görünür alan çerçevesiyle kalibrasyon gösterir; ⚙ ile kendi ayarları.
+- **Kumanda**: dokunmatik alan + yön tuşlu kumanda ve tüm ayarlara erişen ayar paneli.
+
+Bir cihaz Prompter olunca önceki Prompter Kumanda'ya geçer. Ekran yoksa Prompter kendi ekranında akıtır.
+`kontrol.html` eski QR bağlantılarını `index.html?role=kumanda` adresine yönlendirir.
 
 ## Özellikler
 - Hece bazlı akış (Türkçe: hece = sesli harf), noktalama durakları, harf harf solma
