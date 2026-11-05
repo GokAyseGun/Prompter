@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0d0f12">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Prompter Kumanda</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/app.css">
+<script src="vendor/supabase.js"></script>
+</head>
+<body>
+<div id="login" class="login" hidden></div>
+<div id="boot" class="boot"><span class="dot"></span></div>
+
+<div id="app" hidden>
+  <header class="top">
+    <div class="brand"><span class="dot"></span><span>Kumanda</span></div>
+    <div class="top-r">
+      <span class="badge" id="linkBadge"><i></i><span>—</span></span>
+      <a class="btn ghost sm" href="index.html">Prompter</a>
+    </div>
+  </header>
+  <div class="k-tabs"><button class="btn on" data-tab="remote" type="button">Kumanda</button><button class="btn" data-tab="text" type="button">Metin</button></div>
+
+  <div class="k-wrap" id="kwrap" data-tab="remote">
+    <section class="card k-remote">
+      <div class="k-target"><select id="target"></select></div>
+      <div id="noTarget" class="k-empty" hidden>Açık bir prompter ekranı yok.<br>Prompter cihazında uygulamayı açın ve aynı hesapla giriş yapın.</div>
+
+      <div id="setupPanel" hidden>
+        <div class="k-status"><span>Prompter hazırlık ekranında</span><b id="spTitle"></b></div>
+        <div class="k-scripts">
+          <select id="scriptSel"></select>
+          <div class="actions"><button class="btn primary" id="startBtn" type="button">▶ Başlat</button><button class="btn" id="resumeBtn" type="button" hidden>Kaldığı yerden</button></div>
+        </div>
+      </div>
+
+      <div id="livePanel" hidden>
+        <div class="k-status"><span id="kTitle"></span><span id="kTime"></span></div>
+        <div class="k-prog"><i id="kProg"></i></div>
+        <div class="k-big">
+          <button type="button" data-a="linePrev" title="Satır geri">▲</button>
+          <button type="button" data-a="toggle" class="main" id="kPlay">▶</button>
+          <button type="button" data-a="lineNext" title="Satır ileri">▼</button>
+        </div>
+        <div class="k-row">
+          <button type="button" data-hold="boostBack">«<small>basılı geri</small></button>
+          <button type="button" data-a="sectionPrev">⇞<small>önceki bölüm</small></button>
+          <button type="button" data-a="sectionNext">⇟<small>sonraki bölüm</small></button>
+          <button type="button" data-hold="boostFwd">»<small>basılı ileri</small></button>
+        </div>
+        <div class="k-speed">
+          <button type="button" data-a="slower">−</button>
+          <div class="v"><b id="kSps"></b><small id="kWpm"></small></div>
+          <button type="button" data-a="faster">+</button>
+        </div>
+        <input type="range" id="kSpsR" min="2" max="9" step="0.05">
+        <div class="seg" id="kMode">
+          <button type="button" data-v="fixed">Sabit</button><button type="button" data-v="gate">Ses kapısı</button><button type="button" data-v="follow">Sesle takip</button>
+        </div>
+        <div class="k-sections" id="kSections"></div>
+        <div class="k-row" style="grid-template-columns:1fr 1fr">
+          <button type="button" data-a="restart">⏮<small>başa dön</small></button>
+          <button type="button" data-a="exit">✕<small>prompter'dan çık</small></button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card k-text">
+      <div class="k-text-h">
+        <b id="docTitle">Metin</b>
+        <div class="actions">
+          <label class="tog small inline"><input type="checkbox" id="follow" checked><span>Okunan yeri takip et</span></label>
+          <button class="btn sm" id="editBtn" type="button">Düzenle</button>
+          <button class="btn sm primary" id="applyBtn" type="button" hidden>Uygula</button>
+          <button class="btn sm ghost" id="cancelBtn" type="button" hidden>Vazgeç</button>
+        </div>
+      </div>
+      <div class="k-doc" id="doc"><div class="k-empty">Metin bekleniyor…</div></div>
+      <textarea class="k-edit" id="editTa" spellcheck="false" hidden></textarea>
+      <p class="hint" style="margin:0">Bir kelimeye dokunarak prompter'ı oraya götürebilirsiniz. Düzenlemeler akış sırasında konum korunarak prompter'a anında yansır ve kaydedilir.</p>
+    </section>
+  </div>
+</div>
+<script type="module" src="js/kontrol.js"></script>
+</body>
+</html>
