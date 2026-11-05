@@ -1,11 +1,11 @@
-/* Aynalı Prompter — çevrimdışı önbellek.
+/* GG Prompter — çevrimdışı önbellek.
    Uygulama dosyaları: önce ağ (güncellemeler hemen gelsin), ağ yoksa önbellek.
    Fontlar / kütüphaneler / simgeler: önce önbellek. Supabase istekleri önbelleğe alınmaz. */
-const VERSION = 'prompter-v2.0.0';
+const VERSION = 'prompter-v3.0.0';
 const SHELL = [
   './', 'index.html', 'kontrol.html', 'manifest.webmanifest',
   'css/app.css', 'css/fonts.css',
-  'js/app.js', 'js/config.js', 'js/data.js', 'js/engine.js', 'js/input.js', 'js/kontrol.js', 'js/link.js',
+  'js/app.js', 'js/config.js', 'js/data.js', 'js/engine.js', 'js/forms.js', 'js/input.js', 'js/link.js', 'js/remote.js',
   'js/settings.js', 'js/supa.js', 'js/text.js', 'js/util.js', 'js/voice.js',
   'vendor/supabase.js', 'vendor/qrcode.js', 'vendor/mammoth.browser.min.js',
   'icons/icon-192.png', 'icons/icon-512.png',

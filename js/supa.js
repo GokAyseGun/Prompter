@@ -19,7 +19,7 @@ export function loginGate(root, defaultEmail){
     if (u) { resolve(u); return; }
     root.hidden = false;
     root.innerHTML = `<form class="login-box" autocomplete="on">
-        <div class="brand big"><span class="dot"></span>Aynalı Prompter</div>
+        <div class="brand big"><span class="dot"></span>GG Prompter</div>
         <p class="muted">Devam etmek için giriş yapın.</p>
         <label class="lf"><span>E-posta</span><input name="email" type="email" autocomplete="username" required></label>
         <label class="lf"><span>Şifre</span><input name="password" type="password" autocomplete="current-password" required></label>

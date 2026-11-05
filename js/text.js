@@ -65,9 +65,11 @@ export function analyze(text, o = {}){
       lineTok.push(t);
     }
     if (type !== 'p') {
+      const hidden = o.hide && o.hide[type];
+      if (hidden) para.hidden = true;
       const n = lineTok.length || 1;
-      lineTok.forEach(t => { t.dur = CUE_LINE / n; t.pause = 0; });
-      if (lineTok.length) lineTok[lineTok.length - 1].pause = CUE_GAP;
+      lineTok.forEach(t => { t.dur = hidden ? 0 : CUE_LINE / n; t.pause = 0; });
+      if (lineTok.length && !hidden) lineTok[lineTok.length - 1].pause = CUE_GAP;
     } else if (lineTok.length) {
       const last = lineTok[lineTok.length - 1];
       last.pause = Math.max(last.pause, P_PARA * pf);

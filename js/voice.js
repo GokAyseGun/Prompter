@@ -4,7 +4,7 @@ import { normWord } from './text.js';
 
 export const V = {
   on: false, mode: 'fixed', level: -100, open: false, speaking: false,
-  targetU: null, lastHit: 0, lastResult: 0, recOk: false, recErr: '', micErr: '',
+  targetC: null, lastHit: 0, lastResult: 0, recOk: false, recErr: '', micErr: '',
 };
 let stream = null, ctx = null, analyser = null, buf = null, lastLoud = 0, loudSince = 0;
 let rec = null, recWanted = false, words = [], lastJ = -1, onStatus = () => {};
@@ -64,9 +64,9 @@ export function setScript(A){
   words = [];
   for (const t of A.tokens) if (t.kind === 'w' && t.type === 'p') {
     const n = normWord(t.chars.map(c => c.ch).join(''));
-    if (n) words.push({n, u0: t.u0, end: t.u0 + t.dur});
+    if (n) words.push({n, c0: t.c0, end: t.c0 + t.len});
   }
-  lastJ = -1; V.targetU = null;
+  lastJ = -1; V.targetC = null;
 }
 function sim(a, b){
   if (a === b) return 1;
@@ -82,16 +82,16 @@ function sim(a, b){
   }
   return 1 - prev[n] / Math.max(m, n);
 }
-function nearIndex(u){
+function nearIndex(c){
   let lo = 0, hi = words.length - 1, r = 0;
-  while (lo <= hi) { const mid = (lo + hi) >> 1; if (words[mid].u0 <= u) { r = mid; lo = mid + 1; } else hi = mid - 1; }
+  while (lo <= hi) { const mid = (lo + hi) >> 1; if (words[mid].c0 <= c) { r = mid; lo = mid + 1; } else hi = mid - 1; }
   return r;
 }
-let getU = () => 0;
+let getC = () => 0;
 function align(transcript){
   const rw = transcript.split(/\s+/).map(normWord).filter(Boolean).slice(-6);
   if (!rw.length || !words.length) return;
-  const cur = nearIndex(getU()), from = Math.max(0, cur - 4), to = Math.min(words.length - 1, cur + 40);
+  const cur = nearIndex(getC()), from = Math.max(0, cur - 4), to = Math.min(words.length - 1, cur + 40);
   let best = -1, bestS = 0;
   for (let j = from; j <= to; j++) {
     const s0 = sim(rw[rw.length - 1], words[j].n);
@@ -105,7 +105,7 @@ function align(transcript){
   }
   if (best < 0) return;
   if (bestS < 1.6 && rw.length >= 3 && Math.abs(best - cur) > 12) return;   // tek kelimeyle uzak sıçrama yapma
-  lastJ = best; V.targetU = words[best].end; V.lastHit = performance.now();
+  lastJ = best; V.targetC = words[best].end; V.lastHit = performance.now();
 }
 function makeRec(){
   const R = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -129,9 +129,9 @@ function makeRec(){
   return r;
 }
 
-/* Modu başlat/durdur. uGetter: motorun şu anki konumu */
-export async function setMode(mode, uGetter){
-  if (uGetter) getU = uGetter;
+/* Modu başlat/durdur. cGetter: okuma ucunun şu anki harf konumu */
+export async function setMode(mode, cGetter){
+  if (cGetter) getC = cGetter;
   V.mode = mode; V.recErr = '';
   if (mode === 'fixed') { stopAll(); return; }
   V.on = true;
@@ -145,5 +145,6 @@ export async function setMode(mode, uGetter){
   onStatus();
 }
 function stopRec(){ recWanted = false; if (rec) try { rec.abort(); } catch (e) {} }
-export function stopAll(){ V.on = false; V.open = false; stopRec(); stopMic(); V.targetU = null; }
-export function resetFollow(){ lastJ = -1; V.targetU = null; }
+export function stopAll(){ V.on = false; V.open = false; V.mode = 'fixed'; stopRec(); stopMic(); V.targetC = null; }
+export function resetFollow(){ lastJ = -1; V.targetC = null; }
+export const micActive = () => !!analyser;

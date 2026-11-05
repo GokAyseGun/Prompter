@@ -8,7 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Aynalı Prompter</title>
+<title>GG Prompter</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
@@ -22,20 +22,27 @@
 <div id="login" class="login" hidden></div>
 <div id="boot" class="boot"><span class="dot"></span></div>
 
-<div id="setup" hidden>
-  <header class="top">
-    <div class="brand"><span class="dot"></span><span class="bname">Aynalı Prompter</span></div>
-    <div class="top-r">
-      <span class="badge" id="syncBadge" title="Kayıt durumu"><i></i><span>—</span></span>
-      <span class="badge" id="linkBadge" title="Kumanda bağlantısı"><i></i><span>—</span></span>
-      <span class="badge" id="padBadge"><i></i><span>Kontrolcü yok</span></span>
-      <button class="btn ghost sm" id="takesBtn" type="button">Çekimler</button>
-      <button class="btn ghost sm" id="logoutBtn" type="button" title="Çıkış yap">Çıkış</button>
-    </div>
-  </header>
+<header class="top" id="topbar" hidden>
+  <div class="brand"><span class="dot"></span><span class="bname">GG Prompter</span></div>
+  <div class="top-r">
+    <span class="badge" id="syncBadge" data-only="prompter" title="Kayıt durumu"><i></i><span>—</span></span>
+    <span class="badge" id="linkBadge" title="Cihaz bağlantısı"><i></i><span>—</span></span>
+    <span class="badge" id="padBadge"><i></i><span>Kontrolcü yok</span></span>
+    <button class="btn ghost sm" id="takesBtn" data-only="prompter" type="button">Çekimler</button>
+    <div class="roles" id="roleSw" role="group" aria-label="Bu cihazın rolü"></div>
+    <button class="btn ghost sm" id="logoutBtn" type="button" title="Çıkış yap">Çıkış</button>
+  </div>
+</header>
 
+<!-- ================= PROMPTER ================= -->
+<div id="vPrompter" hidden>
   <main class="wrap">
-    <!-- METİN -->
+    <section class="card live" id="live" hidden>
+      <div class="card-h"><h2><span class="live-dot"></span>Canlı akış <span class="muted" id="liveWhere"></span></h2>
+        <button class="btn sm" id="liveHide" type="button">Ayarları göster</button></div>
+      <div class="live-grid"><div id="liveRemote"></div><div class="k-text" id="liveDoc"></div></div>
+    </section>
+
     <section class="card">
       <div class="card-h">
         <h2><b>1</b>Metin</h2>
@@ -67,7 +74,7 @@
       </div>
       <textarea id="ta" spellcheck="false" placeholder="Okunacak metni buraya yazın veya yapıştırın…"></textarea>
       <div class="meta"><span id="meta">0 kelime</span><span id="saveState"></span></div>
-      <label class="tog small"><input type="checkbox" data-g="autoClean"><span>Yapıştırınca biçimi otomatik düzelt</span></label>
+      <label class="tog small"><input type="checkbox" id="autoClean"><span>Yapıştırınca biçimi otomatik düzelt</span></label>
       <div class="target-row">
         <label for="targetIn">Hedef süre</label>
         <input id="targetIn" type="text" inputmode="numeric" placeholder="dk:sn" maxlength="8" autocomplete="off">
@@ -76,166 +83,48 @@
       </div>
     </section>
 
+    <section class="card"><div class="card-h"><h2><b>2</b>Ekran</h2></div><div id="fEkran"></div></section>
+    <section class="card"><div class="card-h"><h2><b>3</b>Yazı</h2><span class="hint" style="margin:0" id="yaziTgt"></span></div><div id="fYazi"></div></section>
+    <section class="card"><div class="card-h"><h2><b>4</b>Akış</h2></div><div id="fAkis"></div></section>
+
     <section class="card">
-      <div class="card-h"><h2>Önizleme</h2><span class="hint" style="margin:0">Yazı tipi, renkler, işaretler ve harf harf solma.</span></div>
-      <div class="pv" id="pv"></div>
+      <div class="card-h"><h2><b>5</b>Önizleme</h2>
+        <div class="actions"><span class="hint" style="margin:0" id="miniInfo"></span>
+          <label class="tog small inline"><input type="checkbox" id="miniMirror"><span>Aynalı göster</span></label></div></div>
+      <div class="mini-wrap"><div class="mini" id="mini"></div></div>
+      <p class="hint">Seçili ekranın oranında, görünür alanı, yazı boyutu, okuma çizgisi, odak ve ekranda görünenlerle küçültülmüş görünümü. Okunan kısım harf harf solmuş gösterilir.</p>
     </section>
 
-    <div class="grid">
-      <!-- EKRAN -->
-      <section class="card">
-        <div class="card-h"><h2><b>2</b>Ekran</h2></div>
-        <div class="field first"><div class="fh"><label for="devName">Bu cihazın adı</label></div>
-          <input id="devName" class="txt" type="text" maxlength="40" autocomplete="off"></div>
-        <div class="field"><div class="fh"><span>Ekran tipi</span></div>
-          <div class="seg profiles" id="profiles"></div></div>
-        <p class="hint">Boyut, aralık, kenar, görünüm, ayna, okuma çizgisi ve görünür alan her ekran tipi için ayrı saklanır.</p>
-        <div class="field"><div class="fh"><span>Görünüm</span></div>
-          <div class="seg" data-p="orientation">
-            <button type="button" data-v="auto">Otomatik</button><button type="button" data-v="landscape">Yatay</button><button type="button" data-v="portrait">Dikey</button>
-          </div></div>
-        <div class="field" id="rotField"><div class="fh"><span>Ekran tutulduğu gibi kalırsa döndürme yönü</span></div>
-          <div class="seg" data-p="rotateDir" data-num>
-            <button type="button" data-v="90">↻ Saat yönünde</button><button type="button" data-v="-90">↺ Saat yönü tersine</button>
-          </div></div>
-        <div class="field"><div class="fh"><span>Ayna</span></div>
-          <div class="seg" data-p="mirror"><button type="button" data-v="none">Düz</button><button type="button" data-v="h">Ters (aynalı)</button></div></div>
-        <label class="tog"><input type="checkbox" data-p="flipV"><span>Baş aşağı çevir<small>Ekran üstte, ters monte edildiyse</small></span></label>
-        <div class="field"><div class="fh"><label for="anchorR">Okuma çizgisi yüksekliği (yukarıdan)</label><output data-o="anchor"></output></div>
-          <input id="anchorR" type="range" data-p="anchor" min="15" max="85" step="1"></div>
-        <div class="subhead">Görünür alan (prompter camı)</div>
-        <div class="field first"><div class="fh"><label for="ctR">Üstten kırp</label><output data-o="cropTop"></output></div>
-          <input id="ctR" type="range" data-p="cropTop" min="0" max="45" step="0.5"></div>
-        <div class="field"><div class="fh"><label for="cbR">Alttan kırp</label><output data-o="cropBottom"></output></div>
-          <input id="cbR" type="range" data-p="cropBottom" min="0" max="45" step="0.5"></div>
-        <div class="field"><div class="fh"><label for="csR">Yanlardan kırp</label><output data-o="cropSide"></output></div>
-          <input id="csR" type="range" data-p="cropSide" min="0" max="35" step="0.5"></div>
-        <p class="hint">Yazı yalnızca camda görünen alanda akar. Yönler okuma yönüne göredir.</p>
-        <button class="linkbtn" id="resetProfile" type="button">Bu ekran tipini varsayılana döndür</button>
-      </section>
-
-      <!-- YAZI -->
-      <section class="card">
-        <div class="card-h"><h2><b>3</b>Yazı</h2></div>
-        <div class="fh"><span>Yazı tipi</span></div>
-        <div class="seg fontgrid" data-g="font" id="fonts"></div>
-        <div class="field"><div class="fh"><span>Yazı şekli</span></div>
-          <div class="seg weights" data-g="weight" data-num id="weights"></div></div>
-        <label class="tog"><input type="checkbox" data-g="italic"><span>İtalik</span></label>
-        <div class="field"><div class="fh"><span>Hizalama</span></div>
-          <div class="seg" data-g="align"><button type="button" data-v="left">Sola</button><button type="button" data-v="center">Ortaya</button></div></div>
-        <div class="field"><div class="fh"><span>Yazı rengi</span></div>
-          <div class="seg colors" data-g="textColor">
-            <button type="button" data-v="#ffffff"><i style="background:#fff"></i>Beyaz</button>
-            <button type="button" data-v="#ffe08a"><i style="background:#ffe08a"></i>Sarı</button>
-            <button type="button" data-v="#bfe9fb"><i style="background:#bfe9fb"></i>Buz mavisi</button>
-            <label class="colorpick" title="Özel renk"><input type="color" data-gc="textColor"></label>
-          </div></div>
-        <div class="field"><div class="fh"><span>Vurgu rengi (**vurgu**)</span></div>
-          <div class="seg colors" data-g="emphColor">
-            <button type="button" data-v="#f2c14e"><i style="background:#f2c14e"></i>Hardal</button>
-            <button type="button" data-v="#ff8a65"><i style="background:#ff8a65"></i>Turuncu</button>
-            <button type="button" data-v="#7fd6ff"><i style="background:#7fd6ff"></i>Mavi</button>
-            <label class="colorpick" title="Özel renk"><input type="color" data-gc="emphColor"></label>
-          </div></div>
-        <div class="field"><div class="fh"><label for="sizeR">Metin boyutu</label><output data-o="size"></output></div>
-          <input id="sizeR" type="range" data-p="size" min="14" max="200" step="1"></div>
-        <div class="field"><div class="fh"><label for="lhR">Satır aralığı</label><output data-o="lineHeight"></output></div>
-          <input id="lhR" type="range" data-p="lineHeight" min="0.9" max="2.6" step="0.05"></div>
-        <div class="field"><div class="fh"><label for="lsR">Harf aralığı</label><output data-o="letter"></output></div>
-          <input id="lsR" type="range" data-p="letter" min="-0.06" max="0.4" step="0.01"></div>
-        <div class="field"><div class="fh"><label for="mgR">Kenar boşluğu (her iki yan)</label><output data-o="margin"></output></div>
-          <input id="mgR" type="range" data-p="margin" min="0" max="30" step="0.5"></div>
-      </section>
-
-      <!-- AKIŞ -->
-      <section class="card">
-        <div class="card-h"><h2><b>4</b>Akış</h2></div>
-        <div class="fh"><span>Akış modu</span></div>
-        <div class="seg" data-g="mode">
-          <button type="button" data-v="fixed">Sabit hız</button><button type="button" data-v="gate">Ses kapısı</button><button type="button" data-v="follow">Sesle takip</button>
-        </div>
-        <p class="hint" id="modeHint"></p>
-        <div id="voiceBox" class="voice-box">
-          <div class="fh"><span>Mikrofon seviyesi</span><button class="linkbtn" id="micTest" type="button">Mikrofonu test et</button></div>
-          <div class="meter"><div class="meter-fill" id="micFill"></div><div class="meter-th" id="micTh"></div></div>
-          <div class="field"><div class="fh"><label for="gdR">Konuşma eşiği</label><output data-o="gateDb"></output></div>
-            <input id="gdR" type="range" data-g="gateDb" min="-70" max="-15" step="1"></div>
-          <div class="field"><div class="fh"><label for="ghR">Susunca durma süresi</label><output data-o="gateHold"></output></div>
-            <input id="ghR" type="range" data-g="gateHold" min="0.3" max="3" step="0.1"></div>
-        </div>
-
-        <div class="field"><div class="fh"><label for="spsR">Akış hızı</label><output data-o="sps"></output></div>
-          <input id="spsR" type="range" data-g="sps" min="2" max="9" step="0.05">
-          <p class="hint">Hız hece bazlıdır: “ve” 1 hece, “müteahhitlerden” 6 hece sürer. Önerilen 4–5 hece/sn.
-            <button class="linkbtn" id="resetSpeed" type="button">Önerilen hıza dön</button> ·
-            <button class="linkbtn" id="speedTestBtn" type="button">Hızımı ölç</button>
-            <span id="personalInfo"></span></p></div>
-        <div class="field"><div class="fh"><label for="fwR">Solma geçiş genişliği</label><output data-o="fadeWidth"></output></div>
-          <input id="fwR" type="range" data-g="fadeWidth" min="1" max="30" step="1"></div>
-        <div class="field"><div class="fh"><label for="rtR">Okunan yazının gri tonu</label><output data-o="readTone"></output></div>
-          <input id="rtR" type="range" data-g="readTone" min="0.1" max="0.95" step="0.01"></div>
-        <div class="field"><div class="fh"><label for="roR">Okunan yazının solması (opaklık)</label><output data-o="readOpacity"></output></div>
-          <input id="roR" type="range" data-g="readOpacity" min="0.15" max="1" step="0.01"></div>
-
-        <div class="subhead">Okuma çizgisi</div>
-        <div class="seg" data-g="markerStyle">
-          <button type="button" data-v="both">Alt çizgi + oklar</button><button type="button" data-v="line">Alt çizgi</button><button type="button" data-v="arrows">Oklar</button><button type="button" data-v="off">Kapalı</button>
-        </div>
-        <div class="field"><div class="fh"><label for="leadR">Alt satıra erken geçiş</label><output data-o="lead"></output></div>
-          <input id="leadR" type="range" data-g="lead" min="0" max="3" step="0.25">
-          <p class="hint">Çizgi okunan satırın altında onunla birlikte çıkar; son heceye bu kadar kala alt satıra geçer.</p></div>
-
-        <div class="subhead">Noktalama duraklamaları</div>
-        <label class="tog"><input type="checkbox" data-g="pauseOn"><span>Noktalamada dur<small>Virgülde kısa, noktada daha uzun, paragraf sonunda en uzun</small></span></label>
-        <div class="field" id="pauseField"><div class="fh"><label for="psR">Durak uzunluğu</label><output data-o="pauseScale"></output></div>
-          <input id="psR" type="range" data-g="pauseScale" min="0.25" max="3" step="0.05">
-          <p class="hint" id="pauseHint"></p></div>
-
-        <div class="subhead">Odak</div>
-        <label class="tog"><input type="checkbox" data-g="focusOn"><span>Odak modu<small>Okunan satırdan uzak bölgeler kararır</small></span></label>
-        <div class="field" id="focusField"><div class="fh"><label for="fsR">Karartma</label><output data-o="focusStrength"></output></div>
-          <input id="fsR" type="range" data-g="focusStrength" min="0.1" max="0.95" step="0.05"></div>
-
-        <div class="subhead">Ekler</div>
-        <label class="tog"><input type="checkbox" data-g="clockOn"><span>Süre göstergesi<small>Prompter ekranında geçen / kalan süre ve hedef farkı</small></span></label>
-        <label class="tog"><input type="checkbox" data-g="countdown"><span>3-2-1 geri sayım</span></label>
-        <label class="tog"><input type="checkbox" data-g="fullscreen"><span>Tam ekran aç<small>Ekran kilidi de otomatik engellenir</small></span></label>
-        <div class="field"><div class="fh"><label for="bmR">Basılı tutunca hızlı ileri/geri katsayısı</label><output data-o="boostMul"></output></div>
-          <input id="bmR" type="range" data-g="boostMul" min="1.5" max="8" step="0.5"></div>
-      </section>
-    </div>
-
-    <!-- TUŞLAR -->
     <section class="card">
-      <div class="card-h"><h2><b>5</b>Tuş atama</h2><button class="linkbtn" id="resetBinds" type="button">Varsayılan tuşlara dön</button></div>
+      <div class="card-h"><h2><b>6</b>Tuş atama</h2><button class="linkbtn" id="resetBinds" type="button">Varsayılan tuşlara dön</button></div>
       <div class="binds" id="binds"></div>
-      <div class="stick-row">
-        <div class="field first"><div class="fh"><span>Sol analog çubuk (yukarı/aşağı)</span></div>
-          <div class="seg" data-g="stickL"><button type="button" data-v="speed">Hız</button><button type="button" data-v="scrub">Sarma</button><button type="button" data-v="off">Kapalı</button></div></div>
-        <div class="field first"><div class="fh"><span>Sağ analog çubuk (yukarı/aşağı)</span></div>
-          <div class="seg" data-g="stickR"><button type="button" data-v="speed">Hız</button><button type="button" data-v="scrub">Sarma</button><button type="button" data-v="off">Kapalı</button></div></div>
-      </div>
-      <p class="hint">Klavye, fare (sol, sağ, orta, yan tuşlar, tekerlek) veya PS / USB / Bluetooth kontrolcü atanabilir; bir eyleme birden çok tuş verilebilir. Analog çubuk: ittikçe hız artar/azalır ya da metin ileri/geri sarılır. Kontrolcüyü tarayıcı, üzerinde bir tuşa basılınca görür.</p>
+      <div id="fSticks"></div>
+      <p class="hint">Klavye, fare (sol, sağ, orta, yan tuşlar, tekerlek) veya PS / USB / Bluetooth kontrolcü atanabilir; bir eyleme birden çok tuş verilebilir. Tuşlar hangi cihaza bağlıysa (Prompter, Ekran veya Kumanda) akışı oradan yönetir. Kontrolcüyü tarayıcı, üzerinde bir tuşa basılınca görür.</p>
     </section>
 
-    <!-- CİHAZLAR -->
     <section class="card">
-      <div class="card-h"><h2><b>6</b>Kumanda ve cihazlar</h2></div>
+      <div class="card-h"><h2><b>7</b>Kumanda ve cihazlar</h2></div>
       <div class="remote-grid">
-        <div class="qr-box">
-          <div id="qr" class="qr"></div>
-          <div class="qr-txt">
-            <b>Telefonu kumanda yap</b>
-            <p class="hint">Telefon kamerasıyla okutun. Aynı hesapla giriş yapılan her cihaz kumanda veya operatör paneli olarak bu ekranı yönetebilir.</p>
-            <div class="actions"><button class="btn sm" id="copyLink" type="button">Bağlantıyı kopyala</button><a class="btn sm ghost" id="openCtl" href="kontrol.html" target="_blank" rel="noopener">Operatör panelini aç</a></div>
+        <div>
+          <div class="qr-box">
+            <div id="qr" class="qr"></div>
+            <div class="qr-txt">
+              <b>Telefonu kumanda yap</b>
+              <p class="hint">Telefon kamerasıyla okutun; aynı hesapla giriş yapınca Kumanda olarak açılır.</p>
+              <div class="actions"><button class="btn sm" id="copyLink" type="button">Bağlantıyı kopyala</button></div>
+            </div>
           </div>
+          <div class="subhead">Harici monitör</div>
+          <p class="hint" style="margin-top:0">Bu bilgisayara bağlı monitörde ayrı bir Ekran penceresi açar. Chrome izin isterse “İzin ver” deyin; pencere doğrudan diğer ekranda açılır.</p>
+          <button class="btn" id="ekWinBtn" type="button">⧉ Ekran penceresi aç</button>
         </div>
         <div>
-          <div class="fh"><span>Bağlı cihazlar</span></div>
+          <div class="fh"><span>Bağlı cihazlar ve rolleri</span></div>
           <ul class="devlist" id="devList"><li class="muted">—</li></ul>
+          <p class="hint">Bir cihazı Prompter yaptığınızda önceki Prompter Kumanda'ya geçer; Ekran cihazları ekran olarak kalır.</p>
+          <div class="field"><div class="fh"><label for="devName">Bu cihazın adı</label></div><input id="devName" class="txt" type="text" maxlength="40" autocomplete="off"></div>
           <div class="subhead">Ayarlar</div>
-          <p class="hint" style="margin-top:4px">Ayarlar ve tuş atamaları hesabınızla tüm cihazlarda eşitlenir. Ek olarak dosyaya da alabilirsiniz.</p>
+          <p class="hint" style="margin-top:0">Ayarlar ve tuş atamaları hesabınızla tüm cihazlarda eşitlenir ve bağlı cihazlara anında aktarılır.</p>
           <div class="actions"><button class="btn sm" id="expBtn" type="button">Ayarları dışa aktar</button>
             <label class="btn sm ghost">İçe aktar<input type="file" id="impIn" accept=".json,application/json"></label></div>
         </div>
@@ -243,7 +132,6 @@
     </section>
     <p class="foot muted" id="foot"></p>
   </main>
-
   <div class="startbar"><div class="inner">
     <div class="est" id="est"></div>
     <div class="start-btns">
@@ -251,6 +139,54 @@
       <button class="btn primary" id="startBtn" type="button">▶&nbsp; Başlat</button>
     </div>
   </div></div>
+</div>
+
+<!-- ================= EKRAN (ayarlar paneli) ================= -->
+<div id="vEkran" hidden>
+  <main class="wrap">
+    <section class="card">
+      <div class="card-h"><h2>Bu ekran</h2>
+        <div class="actions"><button class="btn primary" id="ekBack" type="button">▣ Ekrana dön</button></div></div>
+      <div class="field first"><div class="fh"><label for="ekName">Ekran adı</label></div><input id="ekName" class="txt" type="text" maxlength="40" autocomplete="off"></div>
+      <p class="hint">Bu cihaz camın altındaki aynalı ekrandır. Akış Prompter veya Kumanda'dan başlatılınca ekran kendiliğinden akışa geçer; beklerken görünür alanın çerçevesini gösterir.</p>
+      <div class="subhead">Bu cihazın mikrofonu (yalnızca gösterge)</div>
+      <div id="ekMic"></div>
+    </section>
+    <section class="card"><div class="card-h"><h2>Ekran ayarları</h2></div><div id="ekForm"></div></section>
+    <section class="card"><div class="card-h"><h2>Yazı</h2></div><div id="ekYazi"></div></section>
+  </main>
+</div>
+
+<!-- ================= KUMANDA ================= -->
+<div id="vKumanda" hidden>
+  <div class="km-tabs">
+    <button type="button" class="btn on" data-kt="remote">Kumanda</button>
+    <button type="button" class="btn" data-kt="settings">⚙ Ayarlar</button>
+    <button type="button" class="btn ghost" id="lockBtn" title="Yanlışlıkla basmaya karşı kilitle">🔒</button>
+  </div>
+  <div class="km-body">
+    <div id="kmRemote" class="km-remote"></div>
+    <div id="kmSettings" class="km-settings" hidden>
+      <div class="seg km-sub">
+        <button type="button" data-ks="metin" class="on">Metin</button><button type="button" data-ks="akis">Akış</button><button type="button" data-ks="ekran">Ekran</button>
+        <button type="button" data-ks="yazi">Yazı</button><button type="button" data-ks="tuslar">Tuşlar</button><button type="button" data-ks="cihazlar">Cihazlar</button>
+      </div>
+      <section class="card" data-ksec="metin">
+        <div class="k-scripts"><select id="kmScript" class="txt"></select>
+          <div class="actions"><button class="btn primary" id="kmStart" type="button">▶ Başlat</button><button class="btn" id="kmResume" type="button" hidden>Kaldığı yerden</button></div></div>
+        <div class="k-text" id="kmDoc"></div>
+      </section>
+      <section class="card" data-ksec="akis" hidden><div id="kmAkis"></div></section>
+      <section class="card" data-ksec="ekran" hidden><div id="kmEkran"></div></section>
+      <section class="card" data-ksec="yazi" hidden><div id="kmYazi"></div></section>
+      <section class="card" data-ksec="tuslar" hidden><div class="binds" id="kmBinds"></div><div id="kmSticks"></div></section>
+      <section class="card" data-ksec="cihazlar" hidden>
+        <ul class="devlist" id="kmDevList"></ul>
+        <div class="field"><div class="fh"><label for="kmName">Bu cihazın adı</label></div><input id="kmName" class="txt" type="text" maxlength="40" autocomplete="off"></div>
+      </section>
+    </div>
+  </div>
+  <div class="lock-ov" id="lockOv" hidden><div><b>🔒 Kilitli</b><span>Açmak için 1 saniye basılı tutun</span></div></div>
 </div>
 
 <!-- Tuş yakalama -->
@@ -293,7 +229,7 @@
       <label class="tog small inline"><input type="checkbox" id="takesOnly" checked><span>Sadece bu metin</span></label>
       <button class="btn sm ghost" data-close type="button">Kapat</button></div></div>
     <div class="stats" id="takesStats"></div>
-    <div class="tablewrap"><table class="takes"><thead><tr><th>Tarih</th><th>Metin</th><th>Süre</th><th>İlerleme</th><th>Gerçek hız</th><th>Ayar</th><th>Mod</th><th>Durma</th><th>Geri</th><th></th></tr></thead><tbody id="takesBody"></tbody></table></div>
+    <div class="tablewrap"><table class="takes"><thead><tr><th>Tarih</th><th>Metin</th><th>Süre</th><th>İlerleme</th><th>Gerçek hız</th><th>Ayar</th><th>Mod</th><th>Durma</th><th>Geri</th><th>Cihaz</th><th></th></tr></thead><tbody id="takesBody"></tbody></table></div>
   </div>
 </div>
 
@@ -314,7 +250,7 @@
     <div class="drawer-h"><h3>Metin işaretleri</h3><button class="btn sm ghost" data-close type="button">Kapat</button></div>
     <table class="help">
       <tr><td><code># Giriş</code></td><td>Bölüm başlığı. Okunmaz; bölümler arasında tuşla atlanır.</td></tr>
-      <tr><td><code>// kameraya bak</code></td><td>Okunmayan not satırı, mavi ve küçük görünür.</td></tr>
+      <tr><td><code>// kameraya bak</code></td><td>Okunmayan not satırı. Ekranda gösterilip gösterilmeyeceği Ekran ayarlarından seçilir.</td></tr>
       <tr><td><code>**önemli kelime**</code></td><td>Vurgu, seçtiğiniz vurgu renginde görünür.</td></tr>
       <tr><td><code>[DUR]</code> · <code>[DUR 2]</code></td><td>Elle durak: akış 1 sn (veya yazılan saniye kadar) bekler.</td></tr>
       <tr><td><code>/</code></td><td>Nefes işareti: kısa bir durak.</td></tr>
@@ -323,7 +259,7 @@
   </div>
 </div>
 
-<!-- Akış ekranı -->
+<!-- ================= Akış ekranı ================= -->
 <div id="stage" hidden>
   <div id="rot">
     <div id="mir">
@@ -334,21 +270,27 @@
         <div id="uline"></div>
         <div id="arL" class="arrow l"></div>
         <div id="arR" class="arrow r"></div>
+        <div id="frame" hidden></div>
         <div id="clock"></div>
-        <div id="vind" hidden></div>
+        <div id="vind" hidden><div id="vlev"></div></div>
         <div id="count" hidden></div>
         <div id="hud" hidden></div>
         <div id="stoast"></div>
         <div id="prog"></div>
       </div>
     </div>
+    <div class="stage-top" id="stageTop">
+      <button type="button" class="btn sm" id="stFull">⛶ Tam ekran</button>
+      <button type="button" class="btn sm" id="stGear">⚙ Ayarlar</button>
+      <div class="roles mini" id="roleSw2"></div>
+    </div>
     <div id="ctl">
       <button type="button" data-a="restart" title="Başa dön"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="2.6" height="14" rx="1"/><path d="M19 5.8v12.4a.8.8 0 0 1-1.2.7L9 12.7a.8.8 0 0 1 0-1.4l8.8-6.2a.8.8 0 0 1 1.2.7z"/></svg></button>
       <button type="button" data-a="sectionPrev" title="Önceki bölüm"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 13l6-6 6 6M6 18l6-6 6 6"/></svg></button>
       <button type="button" data-a="linePrev" title="Satır geri"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></button>
-      <button type="button" data-hold="back" title="Basılı tut: hızlı geri">«</button>
+      <button type="button" data-hold="boostBack" title="Basılı tut: hızlı geri">«</button>
       <button type="button" data-a="toggle" class="main" title="Başlat / Durdur" id="ctlPlay"></button>
-      <button type="button" data-hold="fwd" title="Basılı tut: hızlı ileri">»</button>
+      <button type="button" data-hold="boostFwd" title="Basılı tut: hızlı ileri">»</button>
       <button type="button" data-a="lineNext" title="Satır ileri"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
       <button type="button" data-a="sectionNext" title="Sonraki bölüm"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l6 6 6-6M6 11l6 6 6-6"/></svg></button>
       <span class="sep"></span>
@@ -357,7 +299,7 @@
       <button type="button" data-a="faster" title="Hız artır"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 12h12M12 6v12"/></svg></button>
       <span class="sep"></span>
       <button type="button" data-a="modeCycle" class="txtbtn" title="Akış modu" id="ctlMode"></button>
-      <button type="button" data-a="exit" title="Ana ekrana dön"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <button type="button" data-a="exit" title="Akışı bitir"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
   </div>
 </div>

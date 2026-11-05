@@ -1,6 +1,6 @@
 /* Tuş atama: klavye, fare (düğme + tekerlek), kontrolcü (tuş + eksen + analog çubuk) */
 import { $, esc, note } from './util.js';
-import { S, ACTIONS, REPEAT, HOLD, save } from './settings.js';
+import { S, ACTIONS, REPEAT, HOLD, bindsChanged } from './settings.js';
 
 const MOUSE = ['Sol tık','Orta tık','Sağ tık','Yan tuş (geri)','Yan tuş (ileri)'];
 const PAD_BTN = ['✕ Çarpı','○ Daire','□ Kare','△ Üçgen','L1','R1','L2','R2','Share / Create','Options','L3 (sol çubuk bas)','R3 (sağ çubuk bas)','Yön ↑','Yön ↓','Yön ←','Yön →','PS tuşu','Dokunmatik yüzey'];
@@ -70,11 +70,12 @@ export function renderBinds(el){
 }
 export function wireBinds(el){
   onBindsChanged = () => renderBinds(el);
+  if (el.dataset.wired) { renderBinds(el); return; } el.dataset.wired = '1';
   renderBinds(el);
   el.addEventListener('click', e => {
     const add = e.target.closest('[data-add]'); if (add) { openCapture(add.dataset.add); return; }
     const rm = e.target.closest('[data-rm]');
-    if (rm) { const [id, i] = rm.dataset.rm.split(':'); S.binds[id].splice(+i, 1); save(); renderBinds(el); }
+    if (rm) { const [id, i] = rm.dataset.rm.split(':'); S.binds[id].splice(+i, 1); bindsChanged(); renderBinds(el); }
   });
   const z = $('#capZone');
   z.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse') return; e.preventDefault(); assign({type:'mouse', button:e.button}); });
@@ -102,7 +103,7 @@ function assign(b){
     for (let i = arr.length - 1; i >= 0; i--) if (sameB(arr[i], b)) { if (id !== target) moved.push(actionName(id)); arr.splice(i, 1); }
   }
   S.binds[target].push(b);
-  save(); onBindsChanged(); closeCapture();
+  bindsChanged(); onBindsChanged(); closeCapture();
   const l = bLabel(b)[1];
   note(moved.length ? `“${l}” artık ${actionName(target)} için. ${moved.join(', ')} atamasından kaldırıldı.` : `“${l}” → ${actionName(target)}`);
 }

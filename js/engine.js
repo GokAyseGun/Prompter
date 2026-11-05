@@ -1,69 +1,74 @@
-/* ================= Akış motoru (prompter ekranı) ================= */
-import { $, clamp, fmtTime, num, hexRgb, debounce } from './util.js';
-import { S, DEV, prof, fontOf, MODES, save } from './settings.js';
-import { analyze, speedText, durationOf } from './text.js';
-import { V, setMode as voiceSetMode, setScript as voiceSetScript, stopAll as voiceStop, resetFollow, voiceSupported } from './voice.js';
+/* ================= Akış motoru (aynalı ekran) =================
+   Konum birimi u = hece. Cihazlar arası konum her zaman harf sırası (c) ile aktarılır;
+   böylece ekranlar arasında görünürlük farkı olsa da senkron bozulmaz.
+   Lider ekran komutları işler; diğer ekranlar liderin durumunu izler. */
+import { clamp, fmtTime, num, hexRgb, debounce } from './util.js';
+import { S, DEV, prof, fontOf, MODES, setG } from './settings.js';
+import { analyze, speedText } from './text.js';
 
 const el = {};
 const NOTE_RGB = [166, 220, 242], HEAD_RGB = [226, 170, 44], CUE_RGB = [127, 138, 150];
 export const P = {
-  on:false, A:null, chars:[], cls:null, applied:null, tokEls:[], lines:[], knots:[], KI:[], win:1, total:0, u:0,
+  on:false, cal:false, A:null, chars:[], cls:null, applied:null, tokEls:[], lines:[], knots:[], KI:[], win:1, total:0, u:0,
   playing:false, ended:false, counting:false, countEnd:0, holdIdx:0, holdLeft:0,
-  scroll:0, off:0, offV:0, W:0, H:0, anchor:0, fs:40, tone:115, base:[],
-  boost:0, gain:1, lastH:0, mark:-1,
+  scroll:0, off:0, offV:0, W:0, H:0, anchor:0, fs:40, tone:115, base:[], lineH:50,
+  boost:0, gain:1, lastH:0, mark:-1, lead:true, syncAdj:0,
   scriptId:null, title:'', body:'', targetSec:null, rev:0,
   playSec:0, activeSec:0, stops:0, rewinds:0, startedAt:0, uStart:0, maxU:0,
 };
-let hooks = { onExit(){}, onProgress(){}, onChange(){} };
+let H = { onExit(){}, onChange(){}, onProgress(){}, voice: () => null, level: () => -100 };
 
 export function initStage(h){
-  hooks = Object.assign(hooks, h);
-  for (const id of ['stage','rot','mir','area','content','uline','arL','arR','fTop','fBot','clock','vind','count','hud','stoast','prog','ctl','ctlPlay','ctlInfo','ctlMode'])
+  H = Object.assign(H, h);
+  for (const id of ['stage','rot','mir','area','content','uline','arL','arR','fTop','fBot','frame','clock','vind','vlev','count','hud','stoast','prog','ctl','ctlPlay','ctlInfo','ctlMode'])
     el[id] = document.getElementById(id);
   el.ctl.addEventListener('click', e => {
     const b = e.target.closest('button[data-a]'); if (!b) return;
-    e.stopPropagation(); action(b.dataset.a); if (P.on) showCtl();
+    e.stopPropagation(); H.input ? H.input(b.dataset.a) : action(b.dataset.a); if (P.on) showCtl();
   });
   for (const b of el.ctl.querySelectorAll('button[data-hold]')) {
-    const dir = b.dataset.hold;
-    const on = e => { e.preventDefault(); e.stopPropagation(); hold(dir, true); };
-    const off = () => hold(dir, false);
+    const a = b.dataset.hold;
+    const on = e => { e.preventDefault(); e.stopPropagation(); H.inputHold ? H.inputHold(a, true) : hold(a, true); };
+    const off = () => { H.inputHold ? H.inputHold(a, false) : hold(a, false); };
     b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off); b.addEventListener('pointercancel', off);
   }
   el.stage.addEventListener('pointerdown', e => {
-    if (!P.on || e.target.closest('#ctl')) return;
-    if (e.pointerType !== 'mouse') { showCtl(); action('toggle'); }
+    if (!P.on || P.cal || e.target.closest('#ctl') || e.target.closest('.stage-top')) return;
+    if (e.pointerType !== 'mouse') { showCtl(); H.input ? H.input('toggle') : action('toggle'); }
   });
   el.stage.addEventListener('pointermove', e => { if (e.pointerType === 'mouse') showCtl(); });
   el.ctl.addEventListener('pointerenter', () => { overCtl = true; });
   el.ctl.addEventListener('pointerleave', () => { overCtl = false; showCtl(); });
   let rT = 0;
-  const relayout = () => { clearTimeout(rT); rT = setTimeout(() => { if (P.on) layout(); }, 80); };
-  window.addEventListener('resize', relayout);
-  window.addEventListener('orientationchange', relayout);
-  document.addEventListener('fullscreenchange', relayout);
-  if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', relayout);
+  const re = () => { clearTimeout(rT); rT = setTimeout(() => { if (P.on) layout(); }, 80); };
+  window.addEventListener('resize', re);
+  window.addEventListener('orientationchange', re);
+  document.addEventListener('fullscreenchange', re);
+  if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', re);
   document.addEventListener('visibilitychange', () => { if (P.on && document.visibilityState === 'visible') lockWake(); });
 }
 
 /* ---------- kurulum ---------- */
 function build(body){
-  const A = analyze(body, S.g);
+  const sh = prof().show;
+  const A = analyze(body, {...S.g, hide: {n: !sh.notes, h: !sh.heads}});
   const frag = document.createDocumentFragment(), chars = [], cls = [], tokEls = [];
   A.paras.forEach(p => {
     if (p.type === 'gap') { const g = document.createElement('div'); g.className = 'gap'; frag.appendChild(g); return; }
     const d = document.createElement('div'); d.className = 'para' + (p.type === 'h' ? ' hd' : p.type === 'n' ? ' nt' : '');
+    if (p.hidden) d.hidden = true;
     p.tokens.forEach((ti, k) => {
       const t = A.tokens[ti];
       if (k) d.appendChild(document.createTextNode(' '));
-      const s = document.createElement('span'); s.className = 'tk' + (t.kind === 'hold' ? ' hold' : t.kind === 'b' ? ' br' : '');
+      const s = document.createElement('span');
+      s.className = 'tk' + (t.kind === 'hold' ? ' hold' : t.kind === 'b' ? ' br' : '') + (t.kind !== 'w' && !sh.marks ? ' hide' : '');
       for (const ch of t.chars) {
         const e = document.createElement('span'); e.textContent = ch.ch;
         let c = 0;
-        if (t.kind !== 'w') c = 4; else if (p.type === 'h') c = 3; else if (p.type === 'n') c = 2; else if (ch.e) { c = 1; e.className = 'em'; }
+        if (t.kind !== 'w') c = 4; else if (p.type === 'h') c = 3; else if (p.type === 'n') c = 2; else if (ch.e && sh.emph) { c = 1; e.className = 'em'; }
         s.appendChild(e); chars.push(e); cls.push(c);
       }
-      d.appendChild(s); tokEls[ti] = s;
+      d.appendChild(s); tokEls[ti] = (p.hidden || (t.kind !== 'w' && !sh.marks)) ? null : s;
     });
     frag.appendChild(d);
   });
@@ -71,10 +76,9 @@ function build(body){
   el.content.appendChild(frag);
   P.A = A; P.chars = chars; P.cls = Uint8Array.from(cls); P.tokEls = tokEls; P.total = A.totalU;
   P.applied = new Float32Array(chars.length).fill(-1);
-  voiceSetScript(A);
 }
 function applyStyle(){
-  const pr = prof(), g = S.g;
+  const pr = prof(), g = S.g, sh = pr.show;
   const c = el.content.style;
   c.fontFamily = fontOf(g.font).fam + ', system-ui, sans-serif';
   c.fontWeight = g.weight; c.fontStyle = g.italic ? 'italic' : 'normal';
@@ -84,23 +88,25 @@ function applyStyle(){
   el.mir.style.transform = `scale(${pr.mirror === 'h' ? -1 : 1},${pr.flipV ? -1 : 1})`;
   P.tone = Math.round(255 * g.readTone);
   P.base = [hexRgb(g.textColor), hexRgb(g.emphColor), NOTE_RGB, HEAD_RGB, CUE_RGB];
-  const ms = g.markerStyle;
-  el.uline.hidden = !(ms === 'both' || ms === 'line');
-  el.arL.hidden = el.arR.hidden = !(ms === 'both' || ms === 'arrows');
-  el.fTop.hidden = el.fBot.hidden = !g.focusOn;
-  el.clock.hidden = !g.clockOn;
+  el.uline.hidden = !sh.uline;
+  el.arL.hidden = el.arR.hidden = !sh.arrows;
+  el.fTop.hidden = el.fBot.hidden = !sh.focus;
+  el.clock.hidden = !sh.clock || P.cal;
+  el.prog.hidden = !sh.prog || P.cal;
+  el.frame.hidden = !P.cal;
 }
 function computeRotation(){
   const vw = window.innerWidth, vh = window.innerHeight, pr = prof();
   let r = 0;
   if (pr.orientation !== 'auto' && ((pr.orientation === 'landscape') !== (vw >= vh))) r = pr.rotateDir || 90;
-  const W = r ? vh : vw, H = r ? vw : vh;
-  el.rot.style.width = W + 'px'; el.rot.style.height = H + 'px';
+  const W = r ? vh : vw, Hh = r ? vw : vh;
+  el.rot.style.width = W + 'px'; el.rot.style.height = Hh + 'px';
   el.rot.style.transform = `translate(-50%,-50%) rotate(${r}deg)`;
-  return [W, H];
+  return [W, Hh];
 }
 function layout(){
   if (!P.on) return;
+  const c0 = P.A ? headChar() : 0;
   const [W0, H0] = computeRotation(), pr = prof();
   const top = Math.round(H0 * pr.cropTop / 100), bot = Math.round(H0 * pr.cropBottom / 100), side = Math.round(W0 * pr.cropSide / 100);
   el.area.style.inset = `${top}px ${side}px ${bot}px ${side}px`;
@@ -115,8 +121,10 @@ function layout(){
   for (const a of [el.arL, el.arR]) { a.style.borderTopWidth = a.style.borderBottomWidth = ar + 'px'; }
   el.arL.style.borderLeftWidth = el.arR.style.borderRightWidth = Math.round(ar * 1.3) + 'px';
   el.uline.style.height = Math.max(2, Math.round(fs * 0.05)) + 'px';
-  el.clock.style.fontSize = Math.max(14, Math.round(Math.min(fs * 0.32, P.H * 0.035))) + 'px';
+  const small = Math.max(13, Math.round(Math.min(fs * 0.3, P.H * 0.034)));
+  el.clock.style.fontSize = small + 'px'; el.vind.style.fontSize = Math.round(small * 0.8) + 'px';
   measure();
+  if (P.A) P.u = charToU(c0);
   P.off = 0; P.offV = 0; P.mark = -1;
   P.scroll = pathScroll(P.u);
   focusLayout();
@@ -127,13 +135,11 @@ function measure(){
   A.tokens.forEach((t, i) => {
     const s = P.tokEls[i]; if (!s) return;
     const top = s.offsetTop, h = s.offsetHeight || 1, left = s.offsetLeft, right = left + s.offsetWidth;
-    if (!cur || Math.abs(top - cur.top) > h * 0.5) {
-      cur = {top, h, left, right, uA: t.u0, uB: t.u0 + t.dur, t0: i, t1: i}; L.push(cur);
-    } else { cur.uB = t.u0 + t.dur; cur.t1 = i; cur.h = Math.max(cur.h, h); cur.left = Math.min(cur.left, left); cur.right = Math.max(cur.right, right); }
+    if (!cur || Math.abs(top - cur.top) > h * 0.5) { cur = {top, h, left, right, uA: t.u0, uB: t.u0 + t.dur}; L.push(cur); }
+    else { cur.uB = t.u0 + t.dur; cur.h = Math.max(cur.h, h); cur.left = Math.min(cur.left, left); cur.right = Math.max(cur.right, right); }
   });
   for (const l of L) l.center = l.top + l.h / 2;
   P.lines = L;
-  // Satır sınırları (iki satır arası orta nokta) okuma çizgisinden geçerken yeni satır başlar
   const K = [];
   for (let i = 0; i < L.length; i++) {
     const y = i ? (L[i - 1].center + L[i].center) / 2 : L[0].center - ((L[1] ? L[1].center - L[0].center : L[0].h) / 2);
@@ -169,28 +175,27 @@ function integ(u){
 }
 const pathScroll = u => Math.max(0, (integ(u + P.win) - integ(u - P.win)) / (2 * P.win) - P.anchor);
 
-/* ---------- konum yardımcıları ---------- */
+/* ---------- konum ---------- */
 function tokAt(u){ const T = P.A.tokens; let lo = 0, hi = T.length - 1, r = -1; while (lo <= hi) { const m = (lo + hi) >> 1; if (T[m].u0 <= u) { r = m; lo = m + 1; } else hi = m - 1; } return r; }
 export function headChar(u = P.u){
+  if (!P.A) return 0;
   const i = tokAt(u); if (i < 0) return 0;
   const t = P.A.tokens[i];
   return t.dur > 0 ? t.c0 + t.len * clamp((u - t.u0) / t.dur, 0, 1) : t.c0 + t.len;
 }
-function charToU(c){
+export function charToU(c){
   const T = P.A.tokens; let lo = 0, hi = T.length - 1, r = 0;
   while (lo <= hi) { const m = (lo + hi) >> 1; if (T[m].c0 <= c) { r = m; lo = m + 1; } else hi = m - 1; }
   const t = T[r]; if (!t) return 0;
   return t.u0 + (t.len ? t.dur * clamp((c - t.c0) / t.len, 0, 1) : 0);
 }
-function srcToU(src){ const T = P.A.tokens; for (let i = 0; i < T.length; i++) if (T[i].src >= src) return T[i].u0; return P.total; }
 function lineAt(u){ const L = P.lines; let lo = 0, hi = L.length - 1, r = 0; while (lo <= hi) { const m = (lo + hi) >> 1; if (L[m].uA <= u) { r = m; lo = m + 1; } else hi = m - 1; } return r; }
 function markerLine(u){
   const L = P.lines; if (!L.length) return 0;
   let i = lineAt(u);
   if (i < L.length - 1) {
     const l = L[i], end = Math.min(l.uB, L[i + 1].uA);
-    const sw = Math.max(l.uA + (end - l.uA) * 0.5, end - S.g.lead);
-    if (u >= sw) i++;
+    if (u >= Math.max(l.uA + (end - l.uA) * 0.5, end - S.g.lead)) i++;
   }
   return i;
 }
@@ -220,7 +225,7 @@ function updateFades(){
   }
   P.lastH = h;
 }
-function fullRefresh(){ const h = headChar(); for (let i = 0; i < P.chars.length; i++) applyChar(i, charT(i, h)); P.lastH = h; }
+function fullRefresh(){ const h = headChar(); P.applied.fill(-1); for (let i = 0; i < P.chars.length; i++) applyChar(i, charT(i, h)); P.lastH = h; }
 
 /* ---------- gezinme ---------- */
 function seek(u, smooth = true){
@@ -229,10 +234,9 @@ function seek(u, smooth = true){
   P.ended = P.u >= P.total;
   if (P.ended) P.playing = false;
   P.holdLeft = 0;
-  const H = P.A.holds; let k = 0; while (k < H.length && H[k].u < P.u + 1e-6) k++; P.holdIdx = k;
+  const Hs = P.A.holds; let k = 0; while (k < Hs.length && Hs[k].u < P.u + 1e-6) k++; P.holdIdx = k;
   P.off = smooth ? before - pathScroll(P.u) : 0; P.offV = 0;
-  resetFollow();
-  fullRefresh(); updateHud(); hooks.onChange();
+  fullRefresh(); updateHud(); H.onChange();
 }
 function seekLine(d){
   if (!P.lines.length) return;
@@ -241,37 +245,27 @@ function seekLine(d){
   if (t < 0) seek(0); else if (t >= P.lines.length) seek(P.total); else seek(P.lines[t].uA);
 }
 function seekSection(d){
-  const S2 = P.A.sections;
-  if (!S2.length) { toast('Metinde # bölüm başlığı yok'); return; }
-  if (d > 0) { const s = S2.find(x => x.u > P.u + 0.01); if (s) { seek(s.u); toast(s.title); } else toast('Son bölümdesiniz'); }
+  const SE = P.A.sections;
+  if (!SE.length) { toast('Metinde # bölüm başlığı yok'); return; }
+  if (d > 0) { const s = SE.find(x => x.u > P.u + 0.01); if (s) { seek(s.u); toast(s.title); } else toast('Son bölümdesiniz'); }
   else {
     P.rewinds++;
-    let i = -1; for (let k = 0; k < S2.length; k++) if (S2[k].u < P.u - 0.01) i = k;
-    if (i >= 0 && P.u - S2[i].u < S.g.sps * 1.5 && i > 0) i--;
-    if (i >= 0) { seek(S2[i].u); toast(S2[i].title); } else { seek(0); toast('Başa dönüldü'); }
+    let i = -1; for (let k = 0; k < SE.length; k++) if (SE[k].u < P.u - 0.01) i = k;
+    if (i >= 0 && P.u - SE[i].u < S.g.sps * 1.5 && i > 0) i--;
+    if (i >= 0) { seek(SE[i].u); toast(SE[i].title); } else { seek(0); toast('Başa dönüldü'); }
   }
 }
-const saveSoon = debounce(save, 1200);
+const setSpsSoon = debounce(v => setG('sps', v), 150);
 function setSps(v, quiet){
   S.g.sps = clamp(Math.round(v * 100) / 100, 1.5, 10);
-  saveSoon();
+  setSpsSoon(S.g.sps);
   if (!quiet) toast(speedText(S.g.sps, P.A.avgSyl));
-  updateCtl(); hooks.onChange();
-}
-export async function setFlowMode(m){
-  const prev = S.g.mode;
-  S.g.mode = m; save();
-  if (!P.on) return;
-  await voiceSetMode(m, () => P.u);
-  if (V.recErr && m !== 'fixed') {
-    toast(V.recErr, 3200);
-    if (m === 'gate' && !V.on) { S.g.mode = prev; }
-  } else toast(MODES.find(x => x[0] === m)[1]);
-  updateCtl(); hooks.onChange();
+  updateCtl(); H.onChange();
 }
 
+/* Lider ekranda (veya tek cihazda) çalışan eylemler */
 export function action(a){
-  if (!P.on) return;
+  if (!P.on || P.cal) return;
   switch (a) {
     case 'toggle':
       if (P.counting) { P.counting = false; el.count.hidden = true; P.playing = true; }
@@ -287,26 +281,26 @@ export function action(a){
     case 'faster': setSps(S.g.sps + 0.25); break;
     case 'slower': setSps(S.g.sps - 0.25); break;
     case 'restart': P.rewinds++; seek(0); toast('Başa dönüldü'); break;
-    case 'modeCycle': { const i = MODES.findIndex(x => x[0] === S.g.mode); setFlowMode(MODES[(i + 1) % MODES.length][0]); break; }
+    case 'modeCycle': { const i = MODES.findIndex(x => x[0] === S.g.mode); const m = MODES[(i + 1) % MODES.length]; setG('mode', m[0]); toast(m[1]); break; }
     case 'exit': exit(); return;
   }
-  updateHud(); updateCtl(); hooks.onChange();
+  updateHud(); updateCtl(); H.onChange();
 }
 export function hold(a, on){
-  if (!P.on) return;
+  if (!P.on || P.cal) return;
   const dir = a === 'boostFwd' || a === 'fwd' ? 1 : -1;
   if (on) { if (dir < 0 && P.boost >= 0) P.rewinds++; P.boost = dir; }
   else if (P.boost === dir) P.boost = 0;
 }
 let stickToast = 0;
 export function stick(mode, x, dt){
-  if (!P.on) return;
+  if (!P.on || P.cal) return;
   if (mode === 'speed') {
     setSps(S.g.sps - x * 1.2 * dt, true);
     const now = performance.now(); if (now - stickToast > 250) { stickToast = now; toast(speedText(S.g.sps, P.A.avgSyl)); }
   } else if (mode === 'scrub') {
     P.u = clamp(P.u + x * S.g.sps * 6 * dt, 0, P.total);
-    P.ended = P.u >= P.total; resetFollow();
+    P.ended = P.u >= P.total;
   }
 }
 export function remote(cmd){
@@ -314,37 +308,60 @@ export function remote(cmd){
     case 'setSps': setSps(+cmd.value); return;
     case 'seekChar': seek(charToU(+cmd.value)); return;
     case 'seekSection': { const s = P.A.sections[+cmd.value]; if (s) { seek(s.u); toast(s.title); } return; }
-    case 'mode': setFlowMode(cmd.value); return;
     case 'hold': hold(cmd.value, !!cmd.on); return;
-    case 'edit': applyEdit(cmd.body, cmd.title); return;
+    case 'stick': stick(cmd.mode, +cmd.x, +cmd.dt || 0.016); return;
     default: action(cmd.action);
   }
 }
 
 /* Canlı düzenleme: konumu koruyarak metni yenile */
 export function applyEdit(body, title){
-  if (!P.on || typeof body !== 'string') return;
+  if (!P.on || P.cal || typeof body !== 'string') return;
   const old = P.body, i = tokAt(P.u), t = i >= 0 ? P.A.tokens[i] : null;
-  let src = t ? t.src : 0, frac = t && t.dur ? (P.u - t.u0) / t.dur : 0;
+  let src = t ? t.src : 0; const frac = t && t.dur ? (P.u - t.u0) / t.dur : 0;
   let pre = 0; const n = Math.min(old.length, body.length); while (pre < n && old[pre] === body[pre]) pre++;
   if (src >= pre) src = Math.max(pre, src + body.length - old.length);
   P.body = body; if (title != null) P.title = title; P.rev++;
   const wasPlaying = P.playing;
   build(body); applyStyle(); layout();
   const T = P.A.tokens; let k = T.findIndex(x => x.src >= src); if (k < 0) k = T.length - 1;
-  const nu = k >= 0 ? T[k].u0 + (T[k].src === src ? frac * T[k].dur : 0) : 0;
-  seek(nu, false); P.playing = wasPlaying && !P.ended;
+  seek(k >= 0 ? T[k].u0 + (T[k].src === src ? frac * T[k].dur : 0) : 0, false);
+  P.playing = wasPlaying && !P.ended;
   toast('Metin güncellendi');
-  hooks.onChange();
+  H.onChange();
+}
+/* Ayar değişince (yerel veya başka cihazdan) görünümü yenile */
+export function restyle(rebuild){
+  if (!P.on) return;
+  const c = headChar();
+  if (rebuild) build(P.body);
+  applyStyle(); layout();
+  P.u = charToU(c); P.scroll = pathScroll(P.u); fullRefresh();
+}
+
+/* Takipçi ekran: liderin durumuna uy */
+export function follow(st){
+  if (!P.on || P.cal || P.lead || !st || !st.onStage) return;
+  if (st.rev != null && st.body == null && st.scriptId !== P.scriptId) return;
+  P.playing = !!st.playing; P.ended = !!st.ended;
+  if (st.counting && !P.counting) { P.counting = true; P.countEnd = performance.now() + (st.countLeft || 0); el.count.hidden = false; }
+  if (!st.counting && P.counting) { P.counting = false; el.count.hidden = true; }
+  P.gain = st.gain ?? 1; P.holdLeft = st.holding ? Math.max(P.holdLeft, 0.05) : 0;
+  const target = charToU(st.c) + (st.playing ? S.g.sps * P.gain * 0.12 : 0);
+  const diff = target - P.u;
+  if (Math.abs(diff) > S.g.sps * 2.5) seek(target); else P.syncAdj = diff;
+  updateHud();
 }
 
 /* ---------- arayüz ---------- */
 let toastT = 0;
 export function toast(msg, ms = 1400){
+  if (!el.stoast) return;
   el.stoast.textContent = msg; el.stoast.classList.add('show');
   clearTimeout(toastT); toastT = setTimeout(() => el.stoast.classList.remove('show'), ms);
 }
 function updateHud(){
+  if (P.cal) { el.hud.hidden = false; el.hud.textContent = 'Hazır · ' + DEV.name; return; }
   if (P.counting || P.playing) { el.hud.hidden = true; return; }
   el.hud.hidden = false; el.hud.textContent = P.ended ? 'Bitti' : 'Duraklatıldı';
 }
@@ -352,10 +369,12 @@ const PLAY_SVG = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentC
 const PAUSE_SVG = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="5" width="4" height="14" rx="1.2"/><rect x="13.5" y="5" width="4" height="14" rx="1.2"/></svg>';
 let lastPlayIcon = null;
 export const remainSec = () => {
+  if (!P.A) return 0;
   let h = 0; for (let k = P.holdIdx; k < P.A.holds.length; k++) h += P.A.holds[k].sec;
   return (P.total - P.u) / S.g.sps + h + Math.max(0, P.holdLeft);
 };
 function updateCtl(){
+  if (!P.A) return;
   const playing = P.playing || P.counting;
   if (playing !== lastPlayIcon) { el.ctlPlay.innerHTML = playing ? PAUSE_SVG : PLAY_SVG; lastPlayIcon = playing; }
   const pct = P.total ? Math.round(P.u / P.total * 100) : 0;
@@ -364,16 +383,16 @@ function updateCtl(){
 }
 let ctlT = 0, overCtl = false;
 export function showCtl(){
+  if (P.cal) return;
   el.ctl.classList.add('show'); el.stage.classList.remove('idle'); updateCtl();
   clearTimeout(ctlT);
   ctlT = setTimeout(() => { if (!overCtl) { el.ctl.classList.remove('show'); el.stage.classList.add('idle'); } }, 2800);
 }
 function focusLayout(){
   const k = S.g.focusStrength, lh = P.lineH || P.fs * 1.3;
-  const topEnd = Math.max(0, P.anchor - lh * 1.6), botStart = Math.min(P.H, P.anchor + lh * 2.6);
-  el.fTop.style.height = topEnd + 'px';
+  el.fTop.style.height = Math.max(0, P.anchor - lh * 1.6) + 'px';
   el.fTop.style.background = `linear-gradient(rgba(0,0,0,${k}), rgba(0,0,0,${(k * 0.6).toFixed(3)}) 70%, rgba(0,0,0,0))`;
-  el.fBot.style.top = botStart + 'px';
+  el.fBot.style.top = Math.min(P.H, P.anchor + lh * 2.6) + 'px';
   el.fBot.style.background = `linear-gradient(rgba(0,0,0,0), rgba(0,0,0,${(k * 0.55).toFixed(3)}) 45%, rgba(0,0,0,${k}))`;
 }
 function drawMarker(){
@@ -388,7 +407,7 @@ function drawMarker(){
 }
 let lastClock = 0;
 function drawClock(now){
-  if (!S.g.clockOn || now - lastClock < 250) return; lastClock = now;
+  if (el.clock.hidden || now - lastClock < 250) return; lastClock = now;
   const rem = remainSec();
   let s = `${fmtTime(P.playSec)} <span>· kalan ${fmtTime(rem)}</span>`;
   if (P.targetSec) {
@@ -398,53 +417,74 @@ function drawClock(now){
   }
   el.clock.innerHTML = s;
 }
+let vOpen = false;
 function drawVoice(){
-  if (S.g.mode === 'fixed') { el.vind.hidden = true; return; }
+  if (S.g.mode === 'fixed' || !prof().show.voice || P.cal) { el.vind.hidden = true; return; }
   el.vind.hidden = false;
-  el.vind.className = V.open ? 'on' : '';
-  const lv = clamp((V.level + 70) / 60, 0, 1);
-  el.vind.style.setProperty('--lv', lv.toFixed(2));
-  el.vind.dataset.m = S.g.mode === 'follow' ? (V.recOk && performance.now() - V.lastResult < 3000 ? 'TAKİP' : 'SES') : 'SES';
+  el.vind.classList.toggle('on', vOpen);
+  el.vind.dataset.m = S.g.mode === 'follow' ? 'TAKİP' : 'SES';
+  const lv = H.level(), pct = clamp((lv + 70) / 60, 0, 1);
+  el.vlev.style.setProperty('--lv', (pct * 100).toFixed(1) + '%');
+  el.vlev.style.setProperty('--th', (clamp((S.g.gateDb + 70) / 60, 0, 1) * 100).toFixed(1) + '%');
+  el.vlev.classList.toggle('hot', lv > S.g.gateDb);
 }
 
 /* ---------- başlat / bitir ---------- */
 let wakeLock = null;
-async function lockWake(){ try { if (navigator.wakeLock) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {} }
+export async function lockWake(){ try { if (navigator.wakeLock && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } } catch (e) {} }
+function releaseWake(){ if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; } }
 function lockOrientation(){
   const o = prof().orientation;
   try { if (o !== 'auto' && screen.orientation && screen.orientation.lock) screen.orientation.lock(o).catch(() => {}); } catch (e) {}
 }
-export function start({body, scriptId, title, targetSec, startChar = 0}){
-  if (P.on) return;
-  if (S.g.fullscreen && !document.fullscreenElement) {
-    const d = document.documentElement, req = d.requestFullscreen || d.webkitRequestFullscreen;
-    if (req) { try { const pr = req.call(d); if (pr && pr.then) pr.then(lockOrientation).catch(() => {}); } catch (e) {} }
-  }
-  P.on = true;
+export function requestFull(){
+  if (document.fullscreenElement) return;
+  const d = document.documentElement, req = d.requestFullscreen || d.webkitRequestFullscreen;
+  if (req) { try { const pr = req.call(d); if (pr && pr.then) pr.then(lockOrientation).catch(() => {}); } catch (e) {} }
+}
+export function start({body, scriptId = null, title = '', targetSec = null, startChar = 0, calibrate = false, lead = true, autoplay = true}){
+  if (P.on) stopStage(true);
+  if (!calibrate && S.g.fullscreen) requestFull();
+  P.on = true; P.cal = calibrate; P.lead = lead;
   Object.assign(P, {scriptId, title, body, targetSec, rev: P.rev + 1, u: 0, playing: false, ended: false, counting: false,
-    scroll: 0, off: 0, offV: 0, boost: 0, gain: 1, holdIdx: 0, holdLeft: 0, lastH: 0,
+    scroll: 0, off: 0, offV: 0, boost: 0, gain: 1, holdIdx: 0, holdLeft: 0, lastH: 0, syncAdj: 0,
     playSec: 0, activeSec: 0, stops: 0, rewinds: 0, startedAt: Date.now()});
   document.body.classList.add('stage-on');
   el.stage.hidden = false;
+  el.stage.classList.toggle('cal', calibrate);
   build(body); applyStyle(); layout();
   if (startChar > 0) seek(charToU(startChar), false); else fullRefresh();
   P.uStart = P.u; P.maxU = P.u;
   lockWake();
   el.hud.hidden = true; lastPlayIcon = null; updateCtl(); el.stage.classList.add('idle');
-  if (S.g.mode !== 'fixed') setFlowMode(S.g.mode);
+  updateHud();
   const go = () => {
     if (!P.on) return;
     layout(); if (startChar > 0) seek(charToU(startChar), false);
-    if (S.g.countdown) { P.counting = true; P.countEnd = performance.now() + 3000; el.count.hidden = false; el.count.textContent = '3'; }
-    else P.playing = true;
-    updateHud(); updateCtl(); hooks.onChange();
+    if (!calibrate && lead && autoplay) {
+      if (S.g.countdown) { P.counting = true; P.countEnd = performance.now() + 3000; el.count.hidden = false; el.count.textContent = '3'; }
+      else P.playing = true;
+    }
+    updateHud(); updateCtl(); H.onChange();
   };
   const fl = document.fonts && document.fonts.load ? document.fonts.load(`${S.g.italic ? 'italic ' : ''}${S.g.weight} 40px ${fontOf(S.g.font).fam}`, 'ĞğŞşİıÇçÖöÜü') : null;
   if (fl) Promise.race([fl, new Promise(r => setTimeout(r, 900))]).then(go, go); else go();
-  hooks.onChange();
+  H.onChange();
+}
+function stopStage(silent){
+  P.on = false; P.playing = false; P.counting = false; P.boost = 0; P.cal = false;
+  el.count.hidden = true; el.hud.hidden = true; el.ctl.classList.remove('show'); el.vind.hidden = true;
+  el.stage.hidden = true; document.body.classList.remove('stage-on');
+  el.content.textContent = ''; P.chars = []; P.tokEls = []; P.lines = []; P.knots = [];
+  if (!silent) {
+    try { if (document.fullscreenElement && document.exitFullscreen && !H.keepFullscreen?.()) document.exitFullscreen().catch(() => {}); } catch (e) {}
+    try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}
+    if (!H.keepAwake?.()) releaseWake();
+  }
 }
 export function exit(){
   if (!P.on) return;
+  if (P.cal) { stopStage(false); return; }
   const take = {
     script_id: P.scriptId, script_title: P.title || '', started_at: new Date(P.startedAt).toISOString(), ended_at: new Date().toISOString(),
     play_sec: +P.playSec.toFixed(1), progress: P.total ? +(P.maxU / P.total).toFixed(4) : 0, completed: P.ended || P.maxU >= P.total - 0.01,
@@ -453,23 +493,19 @@ export function exit(){
     mode: S.g.mode, stops: P.stops, rewinds: P.rewinds, profile: DEV.profile, device: DEV.name,
   };
   const lastChar = P.ended ? 0 : Math.floor(headChar());
-  P.on = false; P.playing = false; P.counting = false; P.boost = 0;
-  voiceStop();
-  el.count.hidden = true; el.hud.hidden = true; el.ctl.classList.remove('show');
-  el.stage.hidden = true; document.body.classList.remove('stage-on');
-  el.content.textContent = ''; P.chars = []; P.tokEls = []; P.lines = []; P.knots = [];
-  try { if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {}); } catch (e) {}
-  try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}
-  if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
-  hooks.onExit({take, lastChar, scriptId: P.scriptId});
+  const info = {take, lastChar, scriptId: P.scriptId, lead: P.lead};
+  stopStage(false);
+  H.onExit(info);
 }
+export const stopSilently = () => { if (P.on) stopStage(false); };
 
 export function state(){
-  if (!P.on) return {onStage: false};
-  return {onStage: true, scriptId: P.scriptId, title: P.title, rev: P.rev, c: Math.floor(headChar()), u: P.u, total: P.total,
-    playing: P.playing, counting: P.counting, ended: P.ended, sps: S.g.sps, avgSyl: P.A.avgSyl, mode: S.g.mode,
-    elapsed: P.playSec, remain: remainSec(), target: P.targetSec, voiceOpen: V.open, holding: P.holdLeft > 0,
-    sections: P.A.sections.map(s => s.title)};
+  if (!P.on || P.cal) return {onStage: false};
+  return {onStage: true, scriptId: P.scriptId, title: P.title, rev: P.rev, c: +headChar().toFixed(2), u: P.u, total: P.total,
+    playing: P.playing, counting: P.counting, countLeft: P.counting ? Math.max(0, P.countEnd - performance.now()) : 0, ended: P.ended,
+    gain: +P.gain.toFixed(3), sps: S.g.sps, avgSyl: P.A.avgSyl, mode: S.g.mode,
+    elapsed: P.playSec, remain: remainSec(), target: P.targetSec, voiceOpen: vOpen, holding: P.holdLeft > 0,
+    sections: P.A.sections.map(s => s.title), pct: P.total ? P.u / P.total : 0};
 }
 
 /* ---------- kare döngüsü ---------- */
@@ -483,40 +519,47 @@ export function tick(now, dt){
   if (!P.on) return;
   if (P.counting) {
     const r = P.countEnd - now;
-    if (r <= 0) { P.counting = false; el.count.hidden = true; P.playing = true; updateHud(); updateCtl(); hooks.onChange(); }
+    if (r <= 0) { P.counting = false; el.count.hidden = true; if (P.lead) P.playing = true; updateHud(); updateCtl(); H.onChange(); }
     else el.count.textContent = Math.ceil(r / 1000);
   }
   const base = S.g.sps;
   let rate = 0;
-  if (P.boost) rate = P.boost * base * S.g.boostMul;
-  else if (P.playing) {
-    if (P.holdLeft > 0) { P.holdLeft -= dt; }
-    else {
-      let want = 1;
-      if (S.g.mode === 'gate') want = V.open ? 1 : 0;
-      if (S.g.mode === 'follow') {
-        if (V.targetU == null) want = V.open ? 1 : 0;
-        else {
-          const diff = V.targetU + base * 0.45 - P.u;
-          want = clamp(1 + diff / (base * 1.2), 0, 2.6);
-          if (!V.open && now - V.lastHit > 1200) want = 0;
+  const vf = H.voice();              // {open, targetC, lastHit} — sadece lider kullanır
+  vOpen = vf ? !!vf.open : false;
+  if (P.lead) {
+    if (P.boost) rate = P.boost * base * S.g.boostMul;
+    else if (P.playing && !P.cal) {
+      if (P.holdLeft > 0) P.holdLeft -= dt;
+      else {
+        let want = 1;
+        if (S.g.mode === 'gate' && vf) want = vf.open ? 1 : 0;
+        if (S.g.mode === 'follow' && vf) {
+          if (vf.targetC == null) want = vf.open ? 1 : 0;
+          else {
+            const diff = charToU(vf.targetC) + base * 0.45 - P.u;
+            want = clamp(1 + diff / (base * 1.2), 0, 2.6);
+            if (!vf.open && now - vf.lastHit > 1200) want = 0;
+          }
         }
+        const tau = want > P.gain ? 0.08 : 0.22;
+        P.gain += (want - P.gain) * (1 - Math.exp(-dt / tau));
+        rate = base * P.gain;
       }
-      const tau = want > P.gain ? 0.08 : 0.22;
-      P.gain += (want - P.gain) * (1 - Math.exp(-dt / tau));
-      rate = base * P.gain;
     }
+  } else if (P.playing && P.holdLeft <= 0) {
+    rate = base * P.gain;
+    if (P.syncAdj) { const k = Math.min(1, dt * 3); P.u += P.syncAdj * k; P.syncAdj *= (1 - k); if (Math.abs(P.syncAdj) < 0.01) P.syncAdj = 0; }
   }
   if (P.playing || P.holdLeft > 0) P.playSec += dt;
   if (rate !== 0) {
     let nu = P.u + rate * dt;
     if (rate > 0 && !P.boost) {
-      const H = P.A.holds;
-      if (P.holdIdx < H.length && nu >= H[P.holdIdx].u) { nu = H[P.holdIdx].u; P.holdLeft = H[P.holdIdx].sec; P.holdIdx++; }
-    } else if (rate < 0) { const H = P.A.holds; while (P.holdIdx > 0 && H[P.holdIdx - 1].u > nu) P.holdIdx--; }
+      const Hs = P.A.holds;
+      if (P.lead && P.holdIdx < Hs.length && nu >= Hs[P.holdIdx].u) { nu = Hs[P.holdIdx].u; P.holdLeft = Hs[P.holdIdx].sec; P.holdIdx++; }
+    } else if (rate < 0) { const Hs = P.A.holds; while (P.holdIdx > 0 && Hs[P.holdIdx - 1].u > nu) P.holdIdx--; }
     P.u = clamp(nu, 0, P.total);
     if (rate > 0.05 * base) P.activeSec += dt;
-    if (P.u >= P.total && rate > 0) { P.u = P.total; P.playing = false; P.ended = true; updateHud(); updateCtl(); hooks.onChange(); }
+    if (P.u >= P.total && rate > 0) { P.u = P.total; P.playing = false; P.ended = true; updateHud(); updateCtl(); H.onChange(); }
     else if (P.ended && P.u < P.total) { P.ended = false; updateHud(); }
   }
   if (P.u > P.maxU) P.maxU = P.u;
@@ -532,7 +575,5 @@ export function tick(now, dt){
   el.prog.style.transform = `scaleX(${P.total ? (P.u / P.total).toFixed(4) : 0})`;
   drawClock(now); drawVoice();
   if (now - lastInfo > 300 && el.ctl.classList.contains('show')) { lastInfo = now; updateCtl(); }
-  if (now - lastProg > 5000) { lastProg = now; hooks.onProgress(Math.floor(headChar())); }
+  if (P.lead && !P.cal && now - lastProg > 5000) { lastProg = now; H.onProgress(Math.floor(headChar())); }
 }
-export const supportsVoice = voiceSupported;
-export { durationOf };
