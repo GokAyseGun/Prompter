@@ -739,6 +739,37 @@ function mountPrompter(){
     updateFolders(); liveD.setScript({body: CUR.s.body, title: CUR.s.title});
   };
 }
+/* ---------- Claude'dan (veya başka cihazdan) gelen yeni metinler ---------- */
+let inboxSince = new Date().toISOString(), inboxBusy = false;
+const inboxSeen = new Set();
+async function pollInbox(){
+  if (!isRole('prompter') || inboxBusy || document.hidden || flowActive()) return;
+  inboxBusy = true;
+  try {
+    const rows = await D.newScriptsSince(inboxSince);
+    for (const r of rows) {
+      inboxSince = r.created_at > inboxSince ? r.created_at : inboxSince;
+      if (r.folder !== 'Claude' || inboxSeen.has(r.id) || LIB.some(x => x.id === r.id) || (CUR.s && CUR.s.id === r.id)) continue;
+      inboxSeen.add(r.id); showInbox(r);
+    }
+  } catch (e) {} finally { inboxBusy = false; }
+}
+function showInbox(r){
+  let box = $('#inbox');
+  if (!box) { box = document.createElement('div'); box.id = 'inbox'; box.className = 'inbox'; document.body.appendChild(box); }
+  const el = document.createElement('div'); el.className = 'inbox-item';
+  el.innerHTML = `<div><small>${r.folder === 'Claude' ? 'Claude\'dan yeni metin' : 'Yeni metin'}${r.target_sec ? ' · hedef ' + fmtTime(r.target_sec) : ''}</small><b>${esc(r.title || 'Adsız metin')}</b></div>
+    <button class="btn sm primary" type="button">Aç</button><button class="btn sm ghost" type="button" aria-label="Kapat">×</button>`;
+  const [open, close] = el.querySelectorAll('button');
+  open.onclick = async () => { el.remove(); try { LIB = await D.listScripts(); } catch (e) {} await openScript(r.id); window.scrollTo({top: 0, behavior: 'smooth'}); note('Metin açıldı.'); };
+  close.onclick = () => { el.remove(); D.listScripts().then(l => { LIB = l; }).catch(() => {}); };
+  box.appendChild(el);
+  try { navigator.vibrate && navigator.vibrate(20); } catch (e) {}
+}
+setInterval(pollInbox, 15000);
+window.addEventListener('focus', pollInbox);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) pollInbox(); });
+
 async function openEkranWindow(){
   let feat = 'popup,width=1280,height=720';
   try {

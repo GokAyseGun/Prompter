@@ -45,3 +45,7 @@ export const setDraft = (id, d) => lsSet(draftKey(id), d);
 export const clearDraft = id => { try { localStorage.removeItem(draftKey(id)); } catch (e) {} };
 
 export const saveFollowLog = async (row) => { const { error } = await sb.from('follow_logs').insert(row); if (error) throw error; };
+
+/* Başka yerden (ör. Claude) eklenen yeni metinler */
+export const newScriptsSince = async iso =>
+  must(await sb.from('scripts').select('id,title,folder,created_at,target_sec').gt('created_at', iso).order('created_at', {ascending: true}).limit(20));

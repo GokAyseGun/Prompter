@@ -432,3 +432,9 @@ select.txt{appearance:auto}
 .para.nt{color:var(--nt,#a6dcf2)}
 .tk.hold,.tk.br{color:var(--mk,#7f8a96)}
 .k-doc .para.hd,.pv .para.hd{color:#e2aa2c}
+.inbox{position:fixed;top:64px;right:14px;z-index:40;display:flex;flex-direction:column;gap:8px;max-width:min(380px,calc(100% - 28px))}
+.inbox-item{display:flex;align-items:center;gap:8px;background:#1b2027;border:1px solid rgba(226,170,44,.55);border-radius:12px;padding:10px 10px 10px 14px;box-shadow:0 10px 30px rgba(0,0,0,.45);animation:inboxIn .25s ease-out}
+.inbox-item>div{flex:1;min-width:0}
+.inbox-item small{display:block;color:var(--accent);font-size:11.5px;font-weight:600}
+.inbox-item b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@keyframes inboxIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
