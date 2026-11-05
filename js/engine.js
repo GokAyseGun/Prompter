@@ -12,7 +12,7 @@ export const P = {
   on:false, cal:false, A:null, chars:[], cls:null, applied:null, tokEls:[], lines:[], knots:[], KI:[], win:1, total:0, u:0,
   playing:false, ended:false, counting:false, countEnd:0, holdIdx:0, holdLeft:0,
   scroll:0, off:0, offV:0, W:0, H:0, anchor:0, fs:40, tone:115, base:[], lineH:50,
-  boost:0, gain:1, lastH:0, mark:-1, lead:true, syncAdj:0, rateNow:0, fRate:null,
+  boost:0, gain:1, lastH:0, mark:-1, lead:true, syncAdj:0, rateNow:0, fRate:null, jumpSeen:null,
   scriptId:null, title:'', body:'', targetSec:null, rev:0,
   playSec:0, activeSec:0, stops:0, rewinds:0, startedAt:0, uStart:0, maxU:0,
 };
@@ -20,7 +20,7 @@ let H = { onExit(){}, onChange(){}, onProgress(){}, voice: () => null, level: ()
 
 export function initStage(h){
   H = Object.assign(H, h);
-  for (const id of ['stage','rot','mir','area','content','uline','arL','arR','fTop','fBot','frame','clock','vind','vlev','count','hud','stoast','prog','ctl','ctlPlay','ctlInfo','ctlMode'])
+  for (const id of ['stage','rot','mir','area','content','uline','arL','arR','fTop','fBot','frame','clock','vind','vlev','count','hud','stoast','prog','ctl','ctlPlay','ctlInfo','ctlMode','ctlLead'])
     el[id] = document.getElementById(id);
   el.ctl.addEventListener('click', e => {
     const b = e.target.closest('button[data-a]'); if (!b) return;
@@ -380,6 +380,8 @@ function updateCtl(){
   const pct = P.total ? Math.round(P.u / P.total * 100) : 0;
   el.ctlInfo.innerHTML = `<b>${Math.round(S.g.sps * 60 / P.A.avgSyl)}</b> kelime/dk · ${num(S.g.sps)} hece/sn<br>%${pct} · kalan ${fmtTime(remainSec())}`;
   el.ctlMode.textContent = (MODES.find(x => x[0] === S.g.mode) || MODES[0])[1];
+  const fl = S.g.mode === 'follow'; for (const b of el.ctl.querySelectorAll('.leadbtn')) b.hidden = !fl;
+  if (fl && el.ctlLead) el.ctlLead.textContent = num(S.g.followLead || 0, 1);
 }
 let ctlT = 0, overCtl = false;
 export function showCtl(){
@@ -422,7 +424,7 @@ function drawVoice(){
   if (S.g.mode === 'fixed' || !prof().show.voice || P.cal) { el.vind.hidden = true; return; }
   el.vind.hidden = false;
   el.vind.classList.toggle('on', vOpen);
-  el.vind.dataset.m = S.g.mode === 'follow' ? 'TAKİP' + (vLat != null && S.g.followAuto !== false ? ` · gecikme ≈${num(vLat, 1)} sn` : '') : 'SES';
+  el.vind.dataset.m = S.g.mode === 'follow' ? `TAKİP · öne ${num(S.g.followLead || 0, 1)}` + (vLat != null && S.g.followAuto !== false ? ` · gecikme ≈${num(vLat, 1)} sn` : '') : 'SES';
   const lv = H.level(), pct = clamp((lv + 70) / 60, 0, 1);
   el.vlev.style.setProperty('--lv', (pct * 100).toFixed(1) + '%');
   el.vlev.style.setProperty('--th', (clamp((S.g.gateDb + 70) / 60, 0, 1) * 100).toFixed(1) + '%');
@@ -446,7 +448,7 @@ export function start({body, scriptId = null, title = '', targetSec = null, star
   if (P.on) stopStage(true);
   if (!calibrate && S.g.fullscreen) requestFull();
   P.on = true; P.cal = calibrate; P.lead = lead;
-  Object.assign(P, {scriptId, title, body, targetSec, rev: P.rev + 1, u: 0, playing: false, ended: false, counting: false,
+  Object.assign(P, {jumpSeen: null, scriptId, title, body, targetSec, rev: P.rev + 1, u: 0, playing: false, ended: false, counting: false,
     scroll: 0, off: 0, offV: 0, boost: 0, gain: 1, holdIdx: 0, holdLeft: 0, lastH: 0, syncAdj: 0,
     playSec: 0, activeSec: 0, stops: 0, rewinds: 0, startedAt: Date.now()});
   document.body.classList.add('stage-on');
@@ -537,9 +539,12 @@ export function tick(now, dt){
           if (vf.targetC == null) want = vf.open ? 1 : 0;
           else {
             fb = clamp(vf.rate || base, 1.5, 10);                 // senin gerçek okuma hızın
-            const diff = charToU(vf.targetC) - P.u;                // tahmini okuduğun yer (+ öne alma) ile ekrandaki fark
-            if (diff > fb * 6 || diff < -fb * 6) { seek(charToU(vf.targetC)); }
-            want = vf.open ? clamp(1 + diff / (fb * 0.8), 0, 3) : 0;
+            let diff = charToU(vf.targetC) - P.u;                  // tahmini okuduğun yer (+ öne alma) ile ekrandaki fark
+            if (vf.jump != null && vf.jump !== P.jumpSeen) {          // okuyucu bilerek atladı (3+ kelime eşleşti): oraya git
+              if (P.jumpSeen != null) { seek(charToU(vf.targetC)); diff = 0; }
+              P.jumpSeen = vf.jump;
+            }
+            want = vf.open ? clamp(1 + diff / (fb * 0.9), 0, 2.2) : 0;
           }
         }
         const tau = want > P.gain ? 0.08 : 0.22;

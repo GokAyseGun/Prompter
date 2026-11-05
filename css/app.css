@@ -426,3 +426,5 @@ select.txt{appearance:auto}
 .rm-lead b{color:var(--ice);font-variant-numeric:tabular-nums;min-width:74px;text-align:center}
 .follow-box{margin-top:12px;padding:12px;border:1px solid rgba(166,220,242,.35);border-radius:12px;background:rgba(166,220,242,.05)}
 .follow-box .field:first-child{margin-top:0}
+#ctl .info.leadbtn{padding:0 4px;font-size:11px;line-height:1.1}
+#ctl .info.leadbtn b{font-size:15px}

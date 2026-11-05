@@ -3,4 +3,4 @@
 export const SUPABASE_URL = 'https://zfflnrerdevnflchscqe.supabase.co';
 export const SUPABASE_KEY = 'sb_publishable_CNriZk-LAigz43GdbD5Q6w_twNXre3T';
 export const DEFAULT_EMAIL = 'gokaysegun@gmail.com';
-export const APP_VERSION = '3.2.0';
+export const APP_VERSION = '3.3.0';

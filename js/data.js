@@ -43,3 +43,5 @@ export const draftKey = id => 'prompter.draft.' + id;
 export const getDraft = id => lsGet(draftKey(id));
 export const setDraft = (id, d) => lsSet(draftKey(id), d);
 export const clearDraft = id => { try { localStorage.removeItem(draftKey(id)); } catch (e) {} };
+
+export const saveFollowLog = async (row) => { const { error } = await sb.from('follow_logs').insert(row); if (error) throw error; };

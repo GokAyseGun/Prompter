@@ -8,7 +8,7 @@ import { analyze, speedText, durationOf, spsForTarget, cleanText, SAMPLE_SPEED_T
 import * as D from './data.js';
 import { wireBinds, renderBinds, wireGlobalInput, wireStageMouse, setHandler, pollPads, primePads, getPads, capturing } from './input.js';
 import * as E from './engine.js';
-import { V, startMic, stopMic, readLevel, tick as voiceTick, setMode as voiceSetMode, setScript as voiceSetScript, stopAll as voiceStopAll, micActive, estimate as voiceEstimate, resetFollow } from './voice.js';
+import { V, startMic, stopMic, readLevel, tick as voiceTick, setMode as voiceSetMode, setScript as voiceSetScript, stopAll as voiceStopAll, micActive, estimate as voiceEstimate, resetFollow, logStart, logStop, logSample, LOG } from './voice.js';
 import { createLink } from './link.js';
 import { ekranHTML, yaziHTML, akisHTML, sticksHTML, bindForm, tickMeters, setAvgSylSource } from './forms.js';
 import { mountRemote, mountDoc } from './remote.js';
@@ -23,7 +23,7 @@ Bu satırlar yalnızca ayar içindir; gerçek metin akış başlayınca gelir.`;
 const ta = $('#ta');
 let USER = null, LINK = null, PEERS = [], LEAD = null, myStageAt = 0, PING = null;
 let LS = null, LS_AT = 0;                  // lider ekranın son durumu
-const VR = {open: false, tc: null, rate: null, lat: null, level: -100, at: 0};   // Prompter'dan gelen ses kararı
+const VR = {open: false, tc: null, rate: null, lat: null, jump: null, level: -100, at: 0};   // Prompter'dan gelen ses kararı
 const VIEW = {};                            // rol görünümü yardımcıları
 const isRole = r => DEV.role === r;
 const prompterPeer = () => PEERS.find(p => p.role === 'prompter');
@@ -145,7 +145,7 @@ const ON = {
   script(p){ VIEW.onScript && VIEW.onScript(p); },
   info(p){ VIEW.onInfo && VIEW.onInfo(p); },
   cfg(p){ applyPatch(p.patch); },
-  voice(p){ VR.open = !!p.open; VR.tc = p.tc; VR.rate = p.rate; VR.lat = p.lat; VR.level = p.level ?? -100; VR.at = performance.now(); },
+  voice(p){ VR.open = !!p.open; VR.tc = p.tc; VR.rate = p.rate; VR.lat = p.lat; VR.jump = p.jump; VR.level = p.level ?? -100; VR.at = performance.now(); },
   role(p){ if (p.role === 'prompter' && p.from !== DEV.id && (isRole('prompter') || DEV.roleAuto)) setRole('kumanda', true); },
 };
 let joinAt = 0;
@@ -900,11 +900,17 @@ function sendVoice(now){
   if (!V.on || !LINK || !LINK.ready || now - lastVoiceSend < 80) return;
   lastVoiceSend = now;
   const e = S.g.mode === 'follow' ? voiceEstimate() : null;
-  LINK.send('voice', {open: V.open, tc: e ? +e.targetC.toFixed(2) : null, rate: e ? +e.rate.toFixed(3) : null, lat: e ? +e.lat.toFixed(2) : null, level: Math.round(V.level)});
+  LINK.send('voice', {open: V.open, tc: e ? +e.targetC.toFixed(2) : null, rate: e ? +e.rate.toFixed(3) : null, lat: e ? +e.lat.toFixed(2) : null, jump: e ? e.jump : null, level: Math.round(V.level)});
 }
 
 /* ================= Döngü ================= */
-let lastT = performance.now(), lastRec = 0, lastFI = 0;
+let lastT = performance.now(), lastRec = 0, lastFI = 0, lastLog = 0;
+function saveFollowLog(){
+  const sid = LOG.scriptId, data = logStop();
+  if (data.samples.length < 20) return;
+  D.saveFollowLog({script_id: sid || null, settings: {followLead: S.g.followLead, followAuto: S.g.followAuto, sps: S.g.sps, gateDb: S.g.gateDb, gateHold: S.g.gateHold, device: DEV.name, ver: APP_VERSION},
+    data: {...data, rec: navigator.userAgent}}).catch(() => {});
+}
 function frame(now){
   const dt = Math.min(0.1, Math.max(0, (now - lastT) / 1000)); lastT = now;
   pollPads(now, dt);
@@ -917,6 +923,10 @@ function frame(now){
   if (now - lastFI > 500) { lastFI = now; const src = V.on ? {lat: V.lat, rate: V.rate} : (now - VR.at < 1500 ? {lat: VR.lat, rate: VR.rate} : null);
     for (const el of $$('.follow-info')) el.textContent = src && src.lat != null ? `Ölçülen tanıma gecikmesi ≈ ${num(src.lat, 1)} sn${src.rate ? ` · okuma hızınız ≈ ${num(src.rate)} hece/sn` : ''}` : 'Ölçüm, sesle takip sırasında Prompter cihazında yapılır.'; }
   if (now - lastRec > 500) { lastRec = now; reconcileVoice(); }
+  if (V.on && V.mode === 'follow' && flowActive()) {
+    if (!LOG.on) { logStart(); LOG.scriptId = localStage() ? E.P.scriptId : (LS && LS.scriptId); }
+    if (now - lastLog > 250) { lastLog = now; logSample(localStage() ? E.headChar() : (LS && LS.onStage ? LS.c : null)); }
+  } else if (LOG.on && !flowActive()) saveFollowLog();
   requestAnimationFrame(frame);
 }
 
@@ -940,8 +950,8 @@ async function main(){
     onProgress: c => { if (isRole('prompter') && CUR.s && CUR.s.id === E.P.scriptId) CUR.s.last_char = c; },
     voice: () => {
       if (S.g.mode === 'fixed') return null;
-      if (V.on) { const e = S.g.mode === 'follow' ? voiceEstimate() : null; return {open: V.open, targetC: e ? e.targetC : null, rate: e ? e.rate : null, lat: e ? e.lat : null}; }
-      if (performance.now() - VR.at < 1500) return {open: VR.open, targetC: VR.tc, rate: VR.rate, lat: VR.lat};
+      if (V.on) { const e = S.g.mode === 'follow' ? voiceEstimate() : null; return {open: V.open, targetC: e ? e.targetC : null, rate: e ? e.rate : null, lat: e ? e.lat : null, jump: e ? e.jump : null}; }
+      if (performance.now() - VR.at < 1500) return {open: VR.open, targetC: VR.tc, rate: VR.rate, lat: VR.lat, jump: VR.jump};
       return null;
     },
     level: () => V.level,

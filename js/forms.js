@@ -69,7 +69,8 @@ export function akisHTML(){
   ${SEG('mode', 'data-g', [['fixed','Sabit hız'],['gate','Ses kapısı'],['follow','Sesle takip']])}
   <p class="hint mode-hint"></p>
   <div class="follow-box">
-    ${R('followLead', 'data-g', 'Sesle takip öne alma', 0, 5, 0.5)}
+    <div class="fh" style="margin-bottom:0"><span><b style="color:var(--ice)">Sesle takip</b> <span class="follow-off muted">· yalnızca Sesle takip modunda etkilidir</span></span></div>
+    ${R('followLead', 'data-g', 'Öne alma (manuel)', 0, 5, 0.5)}
     <p class="hint" style="margin-top:4px">Sistem okuduğun kelimeyi algılayıp dur-kalk ve hızlanma/yavaşlamayı ona göre yapar; ekranda okuma noktası (solma ve alt çizgi) bu kadar kelime önde gösterilir. Akış sırasında kumandadan veya E / Q tuşlarıyla değiştirilebilir.</p>
     ${T('followAuto', 'data-g', 'Otomatik gecikme telafisi', 'Konuşma tanımanın gecikmesini ölçer ve okuduğun yeri o kadar ileri tahmin eder; akış senin gerçek okuma hızına uyar')}
     <p class="hint follow-info"></p>
@@ -153,7 +154,7 @@ export function bindForm(root, ctx){
     if (q('.rot-field')) q('.rot-field').hidden = pr.orientation === 'auto';
     if (q('.pause-field')) q('.pause-field').classList.toggle('off', !S.g.pauseOn);
     if (q('.voice-box')) q('.voice-box').hidden = S.g.mode === 'fixed';
-    if (q('.follow-box')) q('.follow-box').hidden = S.g.mode !== 'follow';
+    if (q('.follow-off')) q('.follow-off').hidden = S.g.mode === 'follow';
     if (q('.mode-hint')) q('.mode-hint').textContent = MODE_HINT[S.g.mode];
     if (q('.pause-hint')) { const k = S.g.pauseScale / S.g.sps; q('.pause-hint').textContent = `Bu hızda: virgül ≈ ${num(P_COMMA * k)} sn · nokta ≈ ${num(P_STOP * k)} sn · paragraf sonu ≈ ${num(P_PARA * k)} sn`; }
     if (q('.personal')) q('.personal').textContent = S.g.personalSps ? ` · Ölçülen hızınız: ${num(S.g.personalSps)} hece/sn` : '';
