@@ -1,7 +1,7 @@
 import { sb } from './supa.js';
 import { lsGet, lsSet } from './util.js';
 
-const COLS = 'id,title,body,folder,target_sec,last_char,opened_at,created_at,updated_at';
+const COLS = 'id,title,body,folder,favorite,target_sec,last_char,opened_at,created_at,updated_at';
 const must = ({data, error}) => { if (error) throw error; return data; };
 
 export const listScripts = async () => must(await sb.from('scripts').select(COLS).order('updated_at', {ascending:false}));
@@ -10,6 +10,8 @@ export const createScript = async (fields = {}) =>
   must(await sb.from('scripts').insert({title:'Adsız metin', body:'', folder:'', ...fields}).select(COLS).single());
 export const updateScript = async (id, fields) =>
   must(await sb.from('scripts').update(fields).eq('id', id).select('id,updated_at').single());
+export const setScriptMeta = async (id, fields) => must(await sb.from('scripts').update(fields).eq('id', id).select('id').single());
+export const renameFolder = async (from, to) => must(await sb.from('scripts').update({folder: to}).eq('folder', from).select('id'));
 export const deleteScript = async id => must(await sb.from('scripts').delete().eq('id', id));
 export const touchScript = (id, fields = {}) =>
   sb.from('scripts').update({opened_at: new Date().toISOString(), ...fields}).eq('id', id).then(() => {}, () => {});

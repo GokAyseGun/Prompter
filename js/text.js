@@ -5,11 +5,24 @@
      **vurgu**         → vurgulu kelime(ler)
      [DUR] / [DUR 2]   → elle durak (saniye, varsayılan 1)
      /                 → nefes işareti (kısa durak)
+     [YAVAŞ]…[/YAVAŞ]  → okunuş işaretleri: [HIZLI] [SAKİN] [HEYECANLI] de var.
+                         Hızı veya durakları etkilemez; akışta seçilen kısmın altında renkli çizgi gösterir.
 */
+/* Okunuş işaretleri: [id, etiket, ad, ayar anahtarı, CSS değişkeni, varsayılan renk] */
+export const TONES = [
+  ['slow',    'YAVAŞ',     'Yavaş',     'toneSlow',    '--tn-slow',    '#ff5a5f'],
+  ['fast',    'HIZLI',     'Hızlı',     'toneFast',    '--tn-fast',    '#4cd964'],
+  ['calm',    'SAKİN',     'Sakin',     'toneCalm',    '--tn-calm',    '#b9a3f5'],
+  ['excited', 'HEYECANLI', 'Heyecanlı', 'toneExcited', '--tn-excited', '#4aa3ff'],
+];
+export const TONE_VARS = TONES.map(t => [t[3], t[4]]);
+const TONE_SRC = '\\[\\s*(\\/?)\\s*(YAVA[ŞSşs]|H[IİıiI]ZL[IİıiI]|SAK[İIiı]N|HEYECANL[IİıiI])\\s*\\]';
+const toneId = w => { const x = w.toLocaleUpperCase('tr-TR').replace(/I/g, 'İ').replace(/S$/, 'Ş'); return x.startsWith('YAVA') ? 'slow' : x.startsWith('H') && x.length <= 5 ? 'fast' : x.startsWith('SAK') ? 'calm' : 'excited'; };
+export const TONE_RE = new RegExp(TONE_SRC, 'giu');
 export const P_COMMA = 1, P_STOP = 2, P_PARA = 3.5, P_BLANK = 1.5, P_BREATH = 1.2;
 const CUE_LINE = 1.6, CUE_GAP = 0.6;
 const VOW = /[aeıioöuüâîûAEIİOÖUÜÂÎÛ]/g, DIG = /\p{N}/gu, LET = /\p{L}/gu;
-const TOKEN_RE = /\[\s*DUR(?:\s+(\d+(?:[.,]\d+)?))?\s*\]|(?:(?!\[\s*DUR)\S)+/giu;
+const TOKEN_RE = new RegExp('\\[\\s*DUR(?:\\s+(\\d+(?:[.,]\\d+)?))?\\s*\\]|' + TONE_SRC + '|(?:(?!\\[\\s*DUR|' + TONE_SRC + ')\\S)+', 'giu');
 
 export function sylOf(tok){
   const v = (tok.match(VOW) || []).length, d = (tok.match(DIG) || []).length, l = (tok.match(LET) || []).length;
@@ -39,7 +52,7 @@ export function analyze(text, o = {}){
   const pf = follow || o.pauseOn === false ? 0 : (o.pauseScale ?? 1);
   const src = String(text || '').replace(/\r\n?/g, '\n');
   const tokens = [], paras = [], holds = [], sections = [];
-  let u = 0, c = 0, sylSum = 0, wc = 0, holdSec = 0, off = 0;
+  let u = 0, c = 0, sylSum = 0, wc = 0, holdSec = 0, off = 0, tone = null;
   for (const line of src.split('\n')) {
     const lineOff = off; off += line.length + 1;
     if (!line.trim()) { if (tokens.length) u += P_BLANK * pf; paras.push({type:'gap', tokens:[]}); continue; }
@@ -51,6 +64,8 @@ export function analyze(text, o = {}){
     TOKEN_RE.lastIndex = 0;
     while ((m = TOKEN_RE.exec(body))) {
       const raw = m[0], t = {type, para: pi, src: bOff + m.index, u0: 0, dur: 0, pause: 0, c0: c, syl: 0};
+      if (m[3]) { tone = m[2] ? null : toneId(m[3]); continue; }
+      if (tone && type === 'p') t.tone = tone;
       if (/^\[/.test(raw) && /DUR/i.test(raw) && type === 'p') {
         t.kind = 'hold'; t.sec = m[1] ? parseFloat(m[1].replace(',', '.')) : 1;
         t.chars = [{ch: '‖', e: false}];
@@ -123,7 +138,7 @@ export function renderHTML(A, opts = {}){
       const flush = () => { if (buf) { inner += e ? `<b class="em">${escH(buf)}</b>` : escH(buf); buf = ''; } };
       for (const ch of t.chars) { if (ch.e !== e) { flush(); e = ch.e; } buf += ch.ch; }
       flush();
-      const k = t.kind === 'hold' ? ' hold' : t.kind === 'b' ? ' br' : '';
+      const k = (t.kind === 'hold' ? ' hold' : t.kind === 'b' ? ' br' : '') + (t.tone && opts.tones !== false ? ' tn tn-' + t.tone : '');
       return opts.ids ? `<span class="tk${k}" data-t="${ti}">${inner}</span>` : (k ? `<span class="tk${k}">${inner}</span>` : inner);
     });
     out.push(`<div class="${cls}" data-p="${pi}">${parts.join(' ')}</div>`);

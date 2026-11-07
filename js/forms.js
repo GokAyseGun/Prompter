@@ -2,7 +2,7 @@
    data-g = genel ayar, data-p = ekran tipine (profil) özgü ayar, data-show = ekranda görünenler */
 import { $$, clamp, num, debounce } from './util.js';
 import { S, prof, FONTS, WEIGHTS, PROFILE_META, SHOW_ITEMS, DEF_SPS, setG, setP, setShow, resetProfile, onSettings } from './settings.js';
-import { speedText, analyze, P_COMMA, P_STOP, P_PARA } from './text.js';
+import { speedText, analyze, P_COMMA, P_STOP, P_PARA, TONES } from './text.js';
 import { V, startMic, stopMic, readLevel, voiceSupported } from './voice.js';
 import { note } from './util.js';
 
@@ -27,16 +27,42 @@ export function ekranHTML(){
   <div class="field rot-field"><div class="fh"><span>Ekran tutulduğu gibi kalırsa döndürme yönü</span></div>${SEG('rotateDir', 'data-p', [['90','↻ Saat yönünde'],['-90','↺ Saat yönü tersine']], 'data-num')}</div>
   <div class="field"><div class="fh"><span>Ayna</span></div>${SEG('mirror', 'data-p', [['none','Düz'],['h','Ters (aynalı)']])}</div>
   ${T('flipV', 'data-p', 'Baş aşağı çevir', 'Ekran üstte, ters monte edildiyse')}
-  ${R('anchor', 'data-p', 'Okuma çizgisi yüksekliği (yukarıdan)', 15, 85, 1)}
   <div class="subhead">Görünür alan (prompter camı)</div>
   ${R('cropTop', 'data-p', 'Üstten kırp', 0, 45, 0.5)}
   ${R('cropBottom', 'data-p', 'Alttan kırp', 0, 45, 0.5)}
   ${R('cropSide', 'data-p', 'Yanlardan kırp', 0, 35, 0.5)}
   <p class="hint">Yazı yalnızca camda görünen alanda akar. Ekran hazırda beklerken bu alanın çerçevesini gösterir; camdan bakarak ayarlayın.</p>
-  <div class="subhead">Ekranda görünenler</div>
-  <p class="hint" style="margin-top:0">Yeşil tikli olanlar akışta ekranda görünür. Tiki kaldırılanlar yalnızca Prompter ve Kumanda'da görünür.</p>
-  <div class="ticks">${SHOW_ITEMS.map(([k, l, s]) => `<button type="button" class="tick" data-show="${k}"><i></i><span>${l}${s ? `<small>${s}</small>` : ''}</span></button>`).join('')}</div>
+  <p class="hint">Okuma çizgisi yüksekliği ve ekranda görünenler <b>Ekranda Görünenler</b> bölümündedir.</p>
   <button class="linkbtn reset-prof" type="button">Bu ekran tipini varsayılana döndür</button>`;
+}
+const TONE_PRESETS = {
+  toneSlow: [['#ff5a5f','Kırmızı'],['#ff8a65','Turuncu']],
+  toneFast: [['#4cd964','Yeşil'],['#9be7a8','Açık yeşil']],
+  toneCalm: [['#b9a3f5','Lavanta'],['#e2aa2c','Amber']],
+  toneExcited: [['#4aa3ff','Mavi'],['#7fd6ff','Açık mavi']],
+};
+export function gorunenHTML(withTarget = true){
+  return `
+  ${withTarget ? '<div class="tgt-row" data-tgt hidden><label>Ayarlanan ekran</label><select class="txt tgt-sel"></select></div>' : ''}
+  ${R('anchor', 'data-p', 'Okuma çizgisi yüksekliği (yukarıdan)', 15, 85, 1)}
+  <p class="hint" style="margin-top:4px">Akış başladığında ilk satır bu hizada durur.</p>
+  <div class="subhead">Ekranda görünenler</div>
+  <p class="hint" style="margin-top:0">Yeşil tikli olanlar akışta ekranda görünür. Tiki kaldırılanlar yalnızca Prompter ve Kumanda'da görünür. Çizgi yüksekliği ve bu liste her ekran tipi için ayrı saklanır.</p>
+  <div class="ticks">${SHOW_ITEMS.map(([k, l, s]) => `<button type="button" class="tick" data-show="${k}"><i></i><span>${l}${s ? `<small>${s}</small>` : ''}</span></button>`).join('')}</div>
+  <div class="subhead">Okuma çizgisi</div>
+  ${R('lineOpacity', 'data-g', 'Çizgi ve ok opaklığı', 0.1, 1, 0.05)}
+  ${R('lineThick', 'data-g', 'Çizgi kalınlığı', 0.02, 0.16, 0.01)}
+  ${R('lead', 'data-g', 'Alt satıra erken geçiş', 0, 3, 0.25)}
+  <p class="hint" style="margin-top:4px">Çizgi okunan satırın altında onunla birlikte çıkar; son heceye bu kadar kala alt satıra geçer.</p>
+  ${R('focusStrength', 'data-g', 'Odak karartma gücü', 0.1, 0.95, 0.05)}
+  <div class="subhead">Okunuş çizgileri</div>
+  <p class="hint" style="margin-top:0">Metinde Okunuş düğmesiyle işaretlenen kısımların altında akışta görünür. Hızı ve durakları etkilemez.</p>
+  ${TONES.map(t => `<div class="field"><div class="fh"><span>${t[2]}</span></div>
+    <div class="seg colors" data-g="${t[3]}">${TONE_PRESETS[t[3]].map(([c, n]) => `<button type="button" data-v="${c}"><i style="background:${c}"></i>${n}</button>`).join('')}
+      <label class="colorpick" title="Özel renk"><input type="color" data-gc="${t[3]}"></label></div></div>`).join('')}
+  <div class="subhead">Başlangıç</div>
+  ${T('countdown', 'data-g', '5-4-3-2-1 geri sayım')}
+  ${T('fullscreen', 'data-g', 'Tam ekran aç', 'Ekran kilidi de otomatik engellenir')}`;
 }
 export function yaziHTML(){
   return `
@@ -103,26 +129,16 @@ export function akisHTML(){
   ${R('fadeWidth', 'data-g', 'Solma geçiş genişliği', 1, 30, 1)}
   ${R('readTone', 'data-g', 'Okunan yazının gri tonu', 0.1, 0.95, 0.01)}
   ${R('readOpacity', 'data-g', 'Okunan yazının solması (opaklık)', 0.15, 1, 0.01)}
-  <div class="subhead">Okuma çizgisi</div>
-  <label class="tog"><input type="checkbox" data-showtog="uline"><span>Alt çizgi<small>Ekranda görünenler listesiyle bağlıdır</small></span></label>
-  <label class="tog"><input type="checkbox" data-showtog="arrows"><span>Oklar<small>Ekranda görünenler listesiyle bağlıdır</small></span></label>
-  ${R('lineOpacity', 'data-g', 'Çizgi ve ok opaklığı', 0.1, 1, 0.05)}
-  ${R('lineThick', 'data-g', 'Çizgi kalınlığı', 0.02, 0.16, 0.01)}
-  ${R('lead', 'data-g', 'Alt satıra erken geçiş', 0, 3, 0.25)}
-  <p class="hint" style="margin-top:4px">Çizgi okunan satırın altında onunla birlikte çıkar; son heceye bu kadar kala alt satıra geçer.</p>
-  ${R('focusStrength', 'data-g', 'Odak karartma gücü', 0.1, 0.95, 0.05)}
   <div class="pause-sec"><div class="subhead">Noktalama duraklamaları</div>
   ${T('pauseOn', 'data-g', 'Noktalamada dur', 'Virgülde kısa, noktada daha uzun, paragraf sonunda en uzun; [DUR] durakları da uygulanır')}
   <div class="pause-field">${R('pauseScale', 'data-g', 'Durak uzunluğu', 0.25, 3, 0.05)}<p class="hint pause-hint"></p></div></div>
-  <div class="subhead">Ekler</div>
-  ${T('countdown', 'data-g', '3-2-1 geri sayım')}
-  ${T('fullscreen', 'data-g', 'Tam ekran aç', 'Ekran kilidi de otomatik engellenir')}
-  ${R('boostMul', 'data-g', 'Basılı tutunca hızlı ileri/geri katsayısı', 1.5, 8, 0.5)}`;
+`;
 }
 export function sticksHTML(){
   return `<div class="stick-row">
     <div class="field first"><div class="fh"><span>Sol analog çubuk (yukarı/aşağı)</span></div>${SEG('stickL', 'data-g', [['speed','Hız'],['scrub','Sarma'],['off','Kapalı']])}</div>
-    <div class="field first"><div class="fh"><span>Sağ analog çubuk (yukarı/aşağı)</span></div>${SEG('stickR', 'data-g', [['speed','Hız'],['scrub','Sarma'],['off','Kapalı']])}</div></div>`;
+    <div class="field first"><div class="fh"><span>Sağ analog çubuk (yukarı/aşağı)</span></div>${SEG('stickR', 'data-g', [['speed','Hız'],['scrub','Sarma'],['off','Kapalı']])}</div></div>
+  ${R('boostMul', 'data-g', 'Basılı tutunca hızlı ileri/geri katsayısı', 1.5, 8, 0.5)}`;
 }
 
 const MODE_HINT = {

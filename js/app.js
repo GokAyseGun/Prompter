@@ -3,14 +3,14 @@ import { $, $$, clamp, esc, num, fmtTime, parseTime, debounce, fmtDate, lsGet, l
 import { DEFAULT_EMAIL, APP_VERSION } from './config.js';
 import { sb, loginGate } from './supa.js';
 import { S, DEV, WIN, prof, PROFILE_META, PNAME, ROLES, ROLE_NAME, DEF_PROFILE, MODES, setG, saveDevice, syncSettings, exportJSON, importJSON,
-         resetBinds, fontOf, onSettings, setCfgSender, applyPatch } from './settings.js';
-import { analyze, speedText, durationOf, spsForTarget, cleanText, SAMPLE_SPEED_TEXT } from './text.js';
+         resetBinds, fontOf, onSettings, setCfgSender, applyPatch, SHOW_ITEMS, WEIGHTS, ACTIONS } from './settings.js';
+import { analyze, speedText, durationOf, spsForTarget, cleanText, SAMPLE_SPEED_TEXT, TONE_VARS } from './text.js';
 import * as D from './data.js';
 import { wireBinds, renderBinds, wireGlobalInput, wireStageMouse, setHandler, pollPads, primePads, getPads, capturing } from './input.js';
 import * as E from './engine.js';
 import { V, startMic, stopMic, readLevel, tick as voiceTick, setMode as voiceSetMode, setScript as voiceSetScript, stopAll as voiceStopAll, micActive, estimate as voiceEstimate, resetFollow, logStart, logStop, logSample, LOG } from './voice.js';
 import { createLink } from './link.js';
-import { ekranHTML, yaziHTML, akisHTML, sticksHTML, bindForm, tickMeters, setAvgSylSource } from './forms.js';
+import { ekranHTML, yaziHTML, akisHTML, sticksHTML, gorunenHTML, bindForm, tickMeters, setAvgSylSource } from './forms.js';
 import { mountRemote, mountDoc } from './remote.js';
 
 const SAMPLE = 'Merhaba, bu bir önizleme metnidir. Okunan kelimeler **harf harf** yavaşça griye döner ve solar; sıradaki kelimeler parlak kalır. Çağrı, şükür, ılık rüzgâr, İğneada, Ödül ve Ünal gibi Türkçe karakterler sorunsuz görünür.';
@@ -292,7 +292,7 @@ function renderMini(box, body, mirrored){
     if (p.type === 'gap') { parts.push('<div class="gap"></div>'); return; }
     const toks = p.tokens.map(ti => {
       const t = A.tokens[ti]; if (t.kind !== 'w' && !sh.marks) return '';
-      const cls = t.kind === 'hold' ? ' hold' : t.kind === 'b' ? ' br' : '';
+      const cls = (t.kind === 'hold' ? ' hold' : t.kind === 'b' ? ' br' : '') + (sh.tones && t.tone ? ' tn tn-' + t.tone : '');
       return `<span class="tk${cls}" data-t="${ti}">${t.chars.map((c, k) => `<span data-c="${t.c0 + k}"${c.e && sh.emph && t.kind === 'w' && p.type === 'p' ? ' class="em"' : ''}>${esc(c.ch)}</span>`).join('')}</span>`;
     }).filter(Boolean);
     parts.push(`<div class="para${p.type === 'h' ? ' hd' : p.type === 'n' ? ' nt' : ''}">${toks.join(' ')}</div>`);
@@ -346,7 +346,7 @@ document.addEventListener('keydown', e => {
 /* ================= PROMPTER ================= */
 const CUR = {s: null, dirty: false, saving: false, err: false};
 let LIB = [];
-const blankScript = () => ({id: null, title: '', body: '', folder: '', target_sec: null, last_char: 0, updated_at: null});
+const blankScript = () => ({id: null, title: '', body: '', folder: '', favorite: false, target_sec: null, last_char: 0, updated_at: null});
 const curA = () => analyze(CUR.s ? CUR.s.body : '', S.g);
 setAvgSylSource(() => (LS && LS.avgSyl) || (CUR.s ? curA().avgSyl : 2.8));
 
@@ -364,10 +364,10 @@ async function persist(){
   if (!CUR.s || CUR.saving || !CUR.dirty) return;
   CUR.saving = true; CUR.dirty = false; setSaveState();
   const s = CUR.s;
-  const fields = {title: s.title.trim() || 'Adsız metin', body: s.body, folder: s.folder.trim(), target_sec: s.target_sec || null};
+  const fields = {title: s.title.trim() || 'Adsız metin', body: s.body, target_sec: s.target_sec || null};
   try {
     if (!s.id) {
-      const row = await D.createScript(fields);
+      const row = await D.createScript({...fields, folder: s.folder || ''});
       if (CUR.s === s) { s.id = row.id; s.updated_at = row.updated_at; lsSet('prompter.current', s.id); }
       LIB.unshift(row);
     } else {
@@ -381,13 +381,13 @@ async function persist(){
     CUR.err = true; CUR.dirty = true;
     if (s.id) D.setDraft(s.id, {...fields, at: Date.now()}); else lsSet('prompter.draft.new', {...fields, at: Date.now()});
   }
-  CUR.saving = false; setSaveState(); updateFolders();
+  CUR.saving = false; setSaveState(); updateSums();
   if (CUR.dirty && !CUR.err) persistSoon();
 }
 const persistSoon = debounce(persist, 1200);
 function markDirty(){
   CUR.dirty = true; setSaveState();
-  const d = {title: CUR.s.title, body: CUR.s.body, folder: CUR.s.folder, target_sec: CUR.s.target_sec, at: Date.now()};
+  const d = {title: CUR.s.title, body: CUR.s.body, target_sec: CUR.s.target_sec, at: Date.now()};
   if (CUR.s.id) D.setDraft(CUR.s.id, d); else lsSet('prompter.draft.new', d);
   persistSoon(); sendScriptSoon();
 }
@@ -395,11 +395,11 @@ function loadIntoEditor(s){
   CUR.s = s; CUR.dirty = false; CUR.err = false;
   if (s.id) {
     const d = D.getDraft(s.id);
-    if (d && (!s.updated_at || d.at > Date.parse(s.updated_at))) { Object.assign(s, {title: d.title, body: d.body, folder: d.folder, target_sec: d.target_sec ?? s.target_sec}); CUR.dirty = true; persistSoon(); }
+    if (d && (!s.updated_at || d.at > Date.parse(s.updated_at))) { Object.assign(s, {title: d.title, body: d.body, target_sec: d.target_sec ?? s.target_sec}); CUR.dirty = true; persistSoon(); }
     lsSet('prompter.current', s.id); D.touchScript(s.id);
   }
   ta.value = s.body; $('#titleIn').value = s.title === 'Adsız metin' && !s.body ? '' : s.title;
-  $('#folderIn').value = s.folder || ''; $('#targetIn').value = s.target_sec ? fmtTime(s.target_sec) : '';
+  $('#targetIn').value = s.target_sec ? fmtTime(s.target_sec) : '';
   setSaveState(); refreshText(); sendScript(); sendInfo();
 }
 async function openScript(id){
@@ -414,7 +414,7 @@ async function newScript(fields = {}){
   if (fields.body) { CUR.dirty = true; persist(); }
   $('#titleIn').focus();
 }
-function refreshText(){ renderPreviewSoon(); updateEstimate(); updateResume(); }
+function refreshText(){ renderPreviewSoon(); updateEstimate(); updateResume(); updateSums(); }
 const refreshSoon = debounce(refreshText, 150);
 const renderPreview = () => { if (isRole('prompter')) renderMini($('#mini'), CUR.s ? CUR.s.body : '', $('#miniMirror').checked); };
 const renderPreviewSoon = debounce(renderPreview, 120);
@@ -428,7 +428,6 @@ function wireEditor(){
   $('#autoClean').checked = !!S.g.autoClean;
   $('#autoClean').addEventListener('change', e => setG('autoClean', e.target.checked));
   $('#titleIn').addEventListener('input', () => { CUR.s.title = $('#titleIn').value; markDirty(); sendInfo(); });
-  $('#folderIn').addEventListener('input', () => { CUR.s.folder = $('#folderIn').value; markDirty(); });
   $('#targetIn').addEventListener('input', () => { CUR.s.target_sec = parseTime($('#targetIn').value); markDirty(); updateEstimate(); });
   $('#targetApply').addEventListener('click', () => {
     const v = spsForTarget(curA(), CUR.s.target_sec); if (!v) return;
@@ -444,6 +443,18 @@ function wireEditor(){
     ta.value = ''; CUR.s.body = ''; markDirty(); refreshText(); ta.focus();
   });
   for (const b of $$('[data-mk]')) b.addEventListener('click', () => insertMark(b.dataset.mk));
+  // Okunuş menüsü
+  let selKeep = null;
+  const menu = $('#toneMenu');
+  $('#toneBtn').addEventListener('pointerdown', () => { selKeep = [ta.selectionStart, ta.selectionEnd]; });
+  $('#toneBtn').addEventListener('click', e => { e.stopPropagation(); menu.hidden = !menu.hidden; });
+  menu.addEventListener('click', e => {
+    const b = e.target.closest('[data-tone]'); if (!b) return;
+    menu.hidden = true;
+    if (selKeep) ta.setSelectionRange(selKeep[0], selKeep[1]);
+    insertTone(b.dataset.tone);
+  });
+  document.addEventListener('click', e => { if (!e.target.closest('#toneDD')) menu.hidden = true; });
   $('#helpBtn').addEventListener('click', () => openModal('helpModal'));
   $('#fileIn').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) importFile(f); });
 }
@@ -464,6 +475,20 @@ function insertMark(kind){
   if (ins != null) ta.setRangeText(ins, a, b, 'end');
   ta.focus(); ta.dispatchEvent(new Event('input'));
 }
+/* Okunuş işareti: seçili kısmı kelime sınırına genişletip [ETİKET]…[/ETİKET] ile sarar */
+const TONE_TAG_RE = /\[\s*\/?\s*(?:YAVA[ŞSşs]|H[IİıiI]ZL[IİıiI]|SAK[İIiı]N|HEYECANL[IİıiI])\s*\]/giu;
+function insertTone(tag){
+  const v = ta.value; let a = ta.selectionStart, b = ta.selectionEnd;
+  if (a === b) { note('Önce işaretlemek istediğiniz kısmı seçin.'); ta.focus(); return; }
+  while (a > 0 && !/\s/.test(v[a - 1])) a--;
+  while (b < v.length && !/\s/.test(v[b])) b++;
+  while (a < b && /\s/.test(v[a])) a++;
+  while (b > a && /\s/.test(v[b - 1])) b--;
+  const inner = v.slice(a, b).replace(TONE_TAG_RE, '');
+  const ins = `[${tag}]${inner}[/${tag}]`;
+  ta.setRangeText(ins, a, b, 'select');
+  ta.focus(); ta.dispatchEvent(new Event('input'));
+}
 async function importFile(f){
   try {
     let text;
@@ -471,7 +496,7 @@ async function importFile(f){
       if (!window.mammoth) await new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'vendor/mammoth.browser.min.js'; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
       text = (await window.mammoth.extractRawText({arrayBuffer: await f.arrayBuffer()})).value;
     } else text = await f.text();
-    await newScript({title: f.name.replace(/\.(txt|md|docx)$/i, ''), body: cleanText(text), folder: CUR.s ? CUR.s.folder : ''});
+    await newScript({title: f.name.replace(/\.(txt|md|docx)$/i, ''), body: cleanText(text), folder: LIBV.folder || ''});
     note(`“${f.name}” yeni metin olarak eklendi.`);
   } catch (e) { note('Dosya okunamadı.'); }
 }
@@ -496,33 +521,150 @@ function updateResume(){
   const A = curA(); if (s.last_char >= A.chars - 2) { b.hidden = true; return; }
   b.hidden = false; b.textContent = `Kaldığı yerden · %${Math.round(s.last_char / A.chars * 100)}`;
 }
-/* kütüphane */
-function updateFolders(){
-  const fs = [...new Set(LIB.map(s => s.folder).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'tr'));
-  $('#folderList').innerHTML = fs.map(f => `<option value="${esc(f)}">`).join('');
-  return fs;
+/* kütüphane: sıralama, favoriler, klasörler */
+const LIBV = Object.assign({sort: 'date', rev: false, folder: '', fOpen: false}, lsGet('prompter.libView', {}));
+const saveLibView = () => lsSet('prompter.libView', {sort: LIBV.sort, rev: LIBV.rev, folder: LIBV.folder, fOpen: LIBV.fOpen});
+const DURC = new Map();
+function libInfo(s){
+  const k = s.id + '|' + s.body.length + '|' + s.updated_at + '|' + S.g.sps;
+  let v = DURC.get(k);
+  if (!v) { const A = analyze(s.body, S.g); v = {wc: A.wc, sec: durationOf(A, S.g.sps)}; if (DURC.size > 400) DURC.clear(); DURC.set(k, v); }
+  return v;
 }
-let libFolder = '';
+const allFolders = () => [...new Set([...(S.g.folders || []), ...LIB.map(s => s.folder).filter(Boolean)])].sort((a, b) => a.localeCompare(b, 'tr'));
+const setFolders = list => setG('folders', [...new Set(list.map(x => String(x).trim()).filter(Boolean))]);
+const tms = v => v ? Date.parse(v) : 0;
+const SORTS = {
+  fav:    (a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0) || tms(b.updated_at) - tms(a.updated_at),
+  name:   (a, b) => (a.title || '').localeCompare(b.title || '', 'tr', {sensitivity: 'base', numeric: true}),
+  date:   (a, b) => tms(b.updated_at) - tms(a.updated_at),
+  recent: (a, b) => tms(b.opened_at || b.updated_at) - tms(a.opened_at || a.updated_at),
+  dur:    (a, b) => libInfo(a).sec - libInfo(b).sec,
+};
+function updateFolders(){ return allFolders(); }
 function renderLib(){
   const q = $('#libSearch').value.trim().toLocaleLowerCase('tr-TR');
-  const fs = updateFolders();
-  $('#libFolders').innerHTML = fs.length ? ['', ...fs].map(f => `<button type="button" class="fchip${f === libFolder ? ' on' : ''}" data-f="${esc(f)}">${f ? esc(f) : 'Tümü'}</button>`).join('') : '';
-  const rows = LIB.filter(s => (!libFolder || s.folder === libFolder) && (!q || (s.title + ' ' + s.body).toLocaleLowerCase('tr-TR').includes(q)));
+  const fs = allFolders();
+  if (LIBV.folder && !fs.includes(LIBV.folder)) LIBV.folder = '';
+  $('#libFoldersBox').classList.toggle('open', !!LIBV.fOpen);
+  $('#lfInfo').textContent = fs.length ? `${fs.length} klasör` : '';
+  $('#lfList').innerHTML = fs.length ? fs.map(f => {
+    const n = LIB.filter(s => s.folder === f).length;
+    return `<li class="${f === LIBV.folder ? 'on' : ''}"><button type="button" class="lf-pick" data-lf="${esc(f)}"><span>📁 ${esc(f)}</span><small>${n}</small></button>
+      <button type="button" class="lf-x" data-lren="${esc(f)}" title="Yeniden adlandır">✎</button><button type="button" class="lf-x" data-ldel="${esc(f)}" title="Klasörü sil">×</button></li>`;
+  }).join('') : '<li class="muted lf-empty">Henüz klasör yok. Aşağıdan oluşturun.</li>';
+  const act = $('#lfActive'); act.hidden = !LIBV.folder;
+  if (LIBV.folder) act.innerHTML = `<span>📁 <b>${esc(LIBV.folder)}</b></span><button type="button" class="linkbtn" data-lfclear>Tüm metinler</button>`;
+  $('#libSort').value = LIBV.sort; $('#libDir').textContent = LIBV.rev ? '↑' : '↓';
+  let rows = LIB.filter(s => (!LIBV.folder || s.folder === LIBV.folder) && (!q || (s.title + ' ' + s.body).toLocaleLowerCase('tr-TR').includes(q)));
+  rows = rows.slice().sort(SORTS[LIBV.sort] || SORTS.date); if (LIBV.rev) rows.reverse();
   $('#libList').innerHTML = rows.length ? rows.map(s => {
-    const A = analyze(s.body, S.g);
-    return `<li class="${CUR.s && CUR.s.id === s.id ? 'cur' : ''}"><div class="li-main" data-open="${s.id}"><b>${esc(s.title || 'Adsız metin')}</b>
-      <small>${s.folder ? esc(s.folder) + ' · ' : ''}${A.wc} kelime · ≈ ${fmtTime(durationOf(A, S.g.sps))} · ${fmtDate(s.updated_at)}</small>
-      <span class="li-pv">${esc(s.body.slice(0, 140))}</span></div>
+    const I = libInfo(s);
+    return `<li class="${CUR.s && CUR.s.id === s.id ? 'cur' : ''}"><div class="li-main">
+      <div class="li-tags"><button type="button" class="li-fav${s.favorite ? ' on' : ''}" data-fav="${s.id}" title="${s.favorite ? 'Favorilerden çıkar' : 'Favorilere ekle'}">${s.favorite ? '★' : '☆'}</button>
+        <button type="button" class="li-fold" data-fold="${s.id}" title="Klasöre ekle">📁${s.folder ? `<span>${esc(s.folder)}</span>` : ''}</button></div>
+      <div class="li-open" data-open="${s.id}"><b>${esc(s.title || 'Adsız metin')}</b>
+      <small>${I.wc} kelime · ≈ ${fmtTime(I.sec)} · ${fmtDate(s.updated_at)}</small>
+      <span class="li-pv">${esc(s.body.slice(0, 140))}</span></div></div>
       <div class="li-act"><button class="btn sm ghost" data-dup="${s.id}" type="button">Kopyala</button><button class="btn sm ghost danger" data-del="${s.id}" type="button">Sil</button></div></li>`;
-  }).join('') : `<li class="empty">${LIB.length ? 'Eşleşen metin yok.' : 'Henüz metin yok.'}</li>`;
+  }).join('') : `<li class="empty">${LIB.length ? (LIBV.folder && !q ? 'Bu klasörde metin yok.' : 'Eşleşen metin yok.') : 'Henüz metin yok.'}</li>`;
+}
+function syncLocal(id, fields){
+  const s = LIB.find(x => x.id === id); if (s) Object.assign(s, fields);
+  if (CUR.s && CUR.s.id === id) Object.assign(CUR.s, fields);
+  return s;
+}
+async function setScriptFolder(id, f){
+  const s = LIB.find(x => x.id === id); if (!s) return;
+  const old = s.folder;
+  syncLocal(id, {folder: f});
+  if (f && !(S.g.folders || []).includes(f)) setFolders([...(S.g.folders || []), f]);
+  renderLib();
+  try { await D.setScriptMeta(id, {folder: f}); note(f ? `“${s.title || 'Adsız metin'}” → ${f}` : 'Klasörden çıkarıldı.'); }
+  catch (e) { syncLocal(id, {folder: old}); renderLib(); note('Klasör kaydedilemedi.'); }
+}
+async function toggleFav(id){
+  const s = LIB.find(x => x.id === id); if (!s) return;
+  const v = !s.favorite; syncLocal(id, {favorite: v}); renderLib();
+  try { await D.setScriptMeta(id, {favorite: v}); } catch (e) { syncLocal(id, {favorite: !v}); renderLib(); note('Kaydedilemedi.'); }
+}
+function closeFoldMenu(){ const m = $('#foldMenu'); if (m) m.remove(); }
+function openFoldMenu(btn, id){
+  closeFoldMenu();
+  const s = LIB.find(x => x.id === id); if (!s) return;
+  const fs = allFolders(), box = btn.closest('.drawer');
+  const m = document.createElement('div'); m.id = 'foldMenu'; m.className = 'dd-menu fold-menu';
+  m.innerHTML = `<div class="dd-h">Klasöre ekle</div>${fs.map(f => `<button type="button" data-pick="${esc(f)}" class="${s.folder === f ? 'on' : ''}">📁 ${esc(f)}</button>`).join('')}
+    ${s.folder ? '<button type="button" data-pick="" class="muted">Klasörden çıkar</button>' : ''}
+    <div class="dd-new"><input class="txt" type="text" maxlength="60" placeholder="Yeni klasör…" autocomplete="off"><button type="button" class="btn sm" data-newf>Ekle</button></div>`;
+  box.appendChild(m);
+  const r = btn.getBoundingClientRect(), br = box.getBoundingClientRect();
+  m.style.left = Math.max(8, Math.min(r.left - br.left, br.width - 240)) + 'px';
+  const top = r.bottom - br.top + 4, h = m.offsetHeight;
+  m.style.top = (top + h > br.height - 8 ? Math.max(8, r.top - br.top - h - 4) : top) + 'px';
+  const inp = m.querySelector('input');
+  const addNew = () => { const v = inp.value.trim(); if (v) { closeFoldMenu(); setScriptFolder(id, v); } };
+  m.addEventListener('click', e => {
+    e.stopPropagation();
+    const p = e.target.closest('[data-pick]'); if (p) { closeFoldMenu(); if (p.dataset.pick !== s.folder) setScriptFolder(id, p.dataset.pick); return; }
+    if (e.target.closest('[data-newf]')) addNew();
+  });
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addNew(); } if (e.key === 'Escape') closeFoldMenu(); });
+}
+async function renameFolderUI(from){
+  const li = $$('#lfList li').find(x => x.querySelector(`[data-lren]`)?.dataset.lren === from); if (!li) return;
+  li.innerHTML = `<input class="txt lf-rin" type="text" maxlength="60" value="${esc(from)}"><button type="button" class="btn sm" data-rok>Kaydet</button>`;
+  const inp = li.querySelector('input'); inp.focus(); inp.select();
+  const done = async () => {
+    const to = inp.value.trim();
+    if (!to || to === from) { renderLib(); return; }
+    if (allFolders().includes(to) && !await confirmBox(`“${to}” klasörü zaten var. İki klasör birleştirilsin mi?`, 'Birleştir')) { renderLib(); return; }
+    setFolders((S.g.folders || []).filter(f => f !== from).concat(to));
+    for (const s of LIB) if (s.folder === from) syncLocal(s.id, {folder: to});
+    if (LIBV.folder === from) LIBV.folder = to;
+    saveLibView(); renderLib();
+    try { await D.renameFolder(from, to); } catch (e) { note('Klasör adı kaydedilemedi.'); }
+  };
+  li.querySelector('[data-rok]').addEventListener('click', done);
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); done(); } if (e.key === 'Escape') renderLib(); });
+}
+async function deleteFolderUI(f){
+  const n = LIB.filter(s => s.folder === f).length;
+  if (!await confirmBox(n ? `“${f}” klasörü silinsin mi? İçindeki ${n} metin silinmez, klasörsüz kalır.` : `“${f}” klasörü silinsin mi?`, 'Klasörü sil')) return;
+  setFolders((S.g.folders || []).filter(x => x !== f));
+  for (const s of LIB) if (s.folder === f) syncLocal(s.id, {folder: ''});
+  if (LIBV.folder === f) LIBV.folder = '';
+  saveLibView(); renderLib();
+  if (n) try { await D.renameFolder(f, ''); } catch (e) { note('Klasör silinemedi.'); }
 }
 function wireLib(){
-  $('#libBtn').addEventListener('click', async () => { openModal('libModal'); renderLib(); $('#libSearch').focus(); try { LIB = await D.listScripts(); renderLib(); } catch (e) {} });
+  $('#libBtn').addEventListener('click', async () => { openModal('libModal'); renderLib(); try { LIB = await D.listScripts(); renderLib(); } catch (e) {} });
   $('#newBtn').addEventListener('click', () => newScript());
   $('#libSearch').addEventListener('input', renderLib);
-  $('#libFolders').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (b) { libFolder = b.dataset.f; renderLib(); } });
+  $('#libSort').addEventListener('change', () => { LIBV.sort = $('#libSort').value; LIBV.rev = false; saveLibView(); renderLib(); });
+  $('#libDir').addEventListener('click', () => { LIBV.rev = !LIBV.rev; saveLibView(); renderLib(); });
+  $('#lfHead').addEventListener('click', () => { LIBV.fOpen = !LIBV.fOpen; saveLibView(); $('#libFoldersBox').classList.toggle('open', LIBV.fOpen); });
+  const addFolder = () => {
+    const v = $('#lfNew').value.trim(); if (!v) return;
+    if (allFolders().includes(v)) { note('Bu klasör zaten var.'); return; }
+    setFolders([...(S.g.folders || []), v]); $('#lfNew').value = ''; renderLib(); note(`“${v}” klasörü oluşturuldu.`);
+  };
+  $('#lfAdd').addEventListener('click', addFolder);
+  $('#lfNew').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addFolder(); } });
+  $('#lfList').addEventListener('click', e => {
+    const p = e.target.closest('[data-lf]'), r = e.target.closest('[data-lren]'), d = e.target.closest('[data-ldel]');
+    if (p) { LIBV.folder = LIBV.folder === p.dataset.lf ? '' : p.dataset.lf; saveLibView(); renderLib(); }
+    else if (r) renameFolderUI(r.dataset.lren);
+    else if (d) deleteFolderUI(d.dataset.ldel);
+  });
+  $('#lfActive').addEventListener('click', e => { if (e.target.closest('[data-lfclear]')) { LIBV.folder = ''; saveLibView(); renderLib(); } });
+  $('#libModal').addEventListener('click', e => { if (!e.target.closest('#foldMenu') && !e.target.closest('[data-fold]')) closeFoldMenu(); });
+  $('#libList').addEventListener('scroll', closeFoldMenu, {passive: true});
   $('#libList').addEventListener('click', async e => {
     const o = e.target.closest('[data-open]'), du = e.target.closest('[data-dup]'), de = e.target.closest('[data-del]');
+    const fv = e.target.closest('[data-fav]'), fo = e.target.closest('[data-fold]');
+    if (fv) { toggleFav(fv.dataset.fav); return; }
+    if (fo) { $('#foldMenu') && $('#foldMenu').dataset.for === fo.dataset.fold ? closeFoldMenu() : (openFoldMenu(fo, fo.dataset.fold), $('#foldMenu') && ($('#foldMenu').dataset.for = fo.dataset.fold)); return; }
     if (o) { await openScript(o.dataset.open); closeModal('libModal'); }
     else if (du) {
       const s = LIB.find(x => x.id === du.dataset.dup); if (!s) return;
@@ -657,6 +799,44 @@ function showLive(on){
   if (on) { $('#liveWhere').textContent = LEAD ? '· ' + ((PEERS.find(p => p.deviceId === LEAD) || {}).name || '') : ''; window.scrollTo({top: 0, behavior: 'smooth'}); }
   $('.startbar').hidden = on;
 }
+/* Okunuş renkleri: tüm görünümlerde (önizleme, kumanda metni) kullanılsın */
+function applyToneVars(){ for (const [k, v] of TONE_VARS) document.documentElement.style.setProperty(v, S.g[k]); }
+/* Ana kutular: başlığa tıklayınca açılır/kapanır; açılışta hepsi kapalı */
+function makeFolds(){
+  for (const card of $$('#vPrompter main > section.card:not(#live)')) {
+    if (card.classList.contains('fold')) continue;
+    const h = card.querySelector('.card-h'), h2 = h.querySelector('h2');
+    const body = document.createElement('div'), inn = document.createElement('div');
+    body.className = 'fold-body'; inn.className = 'fold-in';
+    while (h.nextSibling) inn.appendChild(h.nextSibling);
+    body.appendChild(inn); card.appendChild(body);
+    card.classList.add('fold'); card.dataset.fold = (h2.querySelector('b') || {}).textContent || '';
+    const sum = document.createElement('span'); sum.className = 'sum'; h2.appendChild(sum);
+    const chev = document.createElement('i'); chev.className = 'chev'; h.appendChild(chev);
+    h2.tabIndex = 0; h2.setAttribute('role', 'button'); h2.setAttribute('aria-expanded', 'false');
+    const toggle = () => {
+      const open = !card.classList.contains('open');
+      card.classList.toggle('open', open); card.classList.remove('shown'); h2.setAttribute('aria-expanded', String(open));
+      clearTimeout(card._shownT);
+      if (open) { card._shownT = setTimeout(() => { if (card.classList.contains('open')) card.classList.add('shown'); }, 560); if (card.dataset.fold === '6') renderPreview(); }
+    };
+    h.addEventListener('click', e => { if (e.target.closest('button, input, label, select, a, textarea')) return; toggle(); });
+    h2.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+  }
+}
+function updateSums(){
+  if (!isRole('prompter')) return;
+  const set = (n, t) => { const e = $(`.card[data-fold="${n}"] .sum`); if (e) e.textContent = t; };
+  const type = tgtCtx.type(), pr = prof(type), A = curA();
+  set('1', CUR.s ? `${CUR.s.title || 'Adsız metin'} · ${A.wc} kelime · ≈ ${fmtTime(durationOf(A, S.g.sps))}` : '');
+  set('2', `${PNAME[type] || type} · ${pr.mirror === 'h' ? 'aynalı' : 'düz'} · ${({auto: 'otomatik', landscape: 'yatay', portrait: 'dikey'})[pr.orientation] || ''}`);
+  set('3', `${fontOf(S.g.font).name} · ${((WEIGHTS.find(w => w[0] === +S.g.weight) || [0, ''])[1]).toLocaleLowerCase('tr-TR')} · ${Math.round(pr.size)} pt`);
+  set('4', `${(MODES.find(m => m[0] === S.g.mode) || ['', ''])[1]}${S.g.mode === 'follow' ? '' : ' · ' + num(S.g.sps) + ' hece/sn'}`);
+  set('5', `çizgi %${Math.round(pr.anchor)} · ${SHOW_ITEMS.filter(([k]) => pr.show[k]).length}/${SHOW_ITEMS.length} öğe görünür`);
+  set('6', PNAME[type] || '');
+  set('7', `${ACTIONS.filter(([a]) => (S.binds[a] || []).length).length}/${ACTIONS.length} eylemde tuş`);
+  set('8', PEERS.length ? `${PEERS.length} cihaz bağlı` : 'bağlı cihaz yok');
+}
 function mountPrompter(){
   $('#vPrompter').hidden = false;
   $('#foot').textContent = `GG Prompter ${APP_VERSION}`;
@@ -664,10 +844,12 @@ function mountPrompter(){
   $('#fYazi').innerHTML = yaziHTML();
   $('#fAkis').innerHTML = akisHTML();
   $('#fSticks').innerHTML = sticksHTML();
-  const after = () => { renderPreviewSoon(); updateEstimate(); $('#yaziTgt').textContent = `Boyut ve aralıklar: ${$('.tgt-sel') ? $('.tgt-sel').selectedOptions[0]?.textContent || '' : ''}`; };
+  $('#fGorunen').innerHTML = gorunenHTML();
+  const after = () => { renderPreviewSoon(); updateEstimate(); updateSums(); $('#yaziTgt').textContent = `Boyut ve aralıklar: ${$('.tgt-sel') ? $('.tgt-sel').selectedOptions[0]?.textContent || '' : ''}`; };
   const ctx = {...tgtCtx, after, onSpeedTest: () => VIEW.openSpeedTest(), keepMic: () => V.on};
-  FORMS.push(bindForm($('#fEkran'), ctx), bindForm($('#fYazi'), ctx), bindForm($('#fAkis'), ctx), bindForm($('#fSticks'), ctx));
+  FORMS.push(bindForm($('#fEkran'), ctx), bindForm($('#fYazi'), ctx), bindForm($('#fAkis'), ctx), bindForm($('#fSticks'), ctx), bindForm($('#fGorunen'), ctx));
   renderTgtSelects();
+  makeFolds();
   wireEditor(); wireLib(); wireVersions(); wireTakes(); wireSpeedTest();
   wireBinds($('#binds'));
   $('#resetBinds').addEventListener('click', () => { resetBinds(); renderBinds($('#binds')); note('Varsayılan tuşlar yüklendi.'); });
@@ -710,7 +892,7 @@ function mountPrompter(){
   VIEW.openScript = id => openScript(id);
   VIEW.startFlow = startFlow;
   VIEW.applyEdit = (body, title) => applyEditLocal(body, title);
-  VIEW.peersChanged = () => { renderTgtSelects(); renderDevList($('#devList')); updateEstimate(); renderPreviewSoon(); liveD.setScript({body: CUR.s ? CUR.s.body : '', title: CUR.s ? CUR.s.title : ''}); };
+  VIEW.peersChanged = () => { renderTgtSelects(); renderDevList($('#devList')); updateEstimate(); renderPreviewSoon(); updateSums(); liveD.setScript({body: CUR.s ? CUR.s.body : '', title: CUR.s ? CUR.s.title : ''}); };
   VIEW.afterTgt = after;
   VIEW.afterStageEnd = () => { $('#vPrompter').hidden = false; $('#topbar').hidden = false; updateResume(); };
   VIEW.settingsChanged = () => { renderPreviewSoon(); updateEstimate(); };
@@ -759,9 +941,10 @@ function mountEkran(){
   $('#stageTop').classList.add('show');
   $('#ekForm').innerHTML = ekranHTML();
   $('#ekYazi').innerHTML = yaziHTML();
+  $('#ekGorunen').innerHTML = gorunenHTML(false);
   $('#ekMic').innerHTML = `<div class="fh"><span>Seviye</span><button class="linkbtn mic-test" type="button">Mikrofonu test et</button></div><div class="meter"><div class="meter-fill"></div><div class="meter-th"></div></div>`;
   const selfCtx = {type: () => DEV.profile, setType(t){ DEV.profile = t; saveDevice(); track(); }};
-  FORMS.push(bindForm($('#ekForm'), selfCtx), bindForm($('#ekYazi'), selfCtx), bindForm($('#ekMic'), selfCtx));
+  FORMS.push(bindForm($('#ekForm'), selfCtx), bindForm($('#ekGorunen'), selfCtx), bindForm($('#ekYazi'), selfCtx), bindForm($('#ekMic'), selfCtx));
   $('#ekName').value = DEV.name;
   $('#ekName').addEventListener('input', debounce(() => { DEV.name = $('#ekName').value.trim() || 'Ekran'; saveDevice(); track(); }, 500));
   const cal = () => { if (!localStage()) E.start({body: CAL_TEXT, calibrate: true, startChar: 150}); };
@@ -786,10 +969,11 @@ function mountKumanda(){
   $('#kmAkis').innerHTML = akisHTML();
   $('#kmEkran').innerHTML = ekranHTML() + `<div class="subhead">Önizleme</div><div class="mini-wrap"><div class="mini" id="kmMini"></div></div>`;
   $('#kmYazi').innerHTML = yaziHTML();
+  $('#kmGorunen').innerHTML = gorunenHTML();
   $('#kmSticks').innerHTML = sticksHTML();
   const after = () => renderMini($('#kmMini'), doc.body, false);
   const ctx = {...tgtCtx, after, onSpeedTest: () => note('Hız ölçümü Prompter cihazındadır.')};
-  FORMS.push(bindForm($('#kmAkis'), ctx), bindForm($('#kmEkran'), ctx), bindForm($('#kmYazi'), ctx), bindForm($('#kmSticks'), ctx));
+  FORMS.push(bindForm($('#kmAkis'), ctx), bindForm($('#kmEkran'), ctx), bindForm($('#kmGorunen'), ctx), bindForm($('#kmYazi'), ctx), bindForm($('#kmSticks'), ctx));
   renderTgtSelects();
   wireBinds($('#kmBinds'));
   for (const b of $$('.km-tabs [data-kt]')) b.addEventListener('click', () => {
@@ -991,9 +1175,11 @@ async function main(){
   setCfgSender(patch => LINK.send('cfg', {patch}));
   // yalnızca gerekince yeniden kur: görünürlük/duraklar → metni yeniden diz; görünüm → stili yenile
   const sigBuild = () => JSON.stringify([DEV.profile, prof().show, S.g.pauseOn, S.g.pauseScale, S.g.mode === 'follow']);
-  const sigLook = () => JSON.stringify([prof(), S.g.font, S.g.weight, S.g.italic, S.g.align, S.g.textColor, S.g.emphColor, S.g.markColor, S.g.noteColor, S.g.lineOpacity, S.g.lineThick, S.g.readTone, S.g.readOpacity, S.g.focusStrength]);
+  const sigLook = () => JSON.stringify([prof(), S.g.font, S.g.weight, S.g.italic, S.g.align, S.g.textColor, S.g.emphColor, S.g.markColor, S.g.noteColor, S.g.lineOpacity, S.g.lineThick, S.g.readTone, S.g.readOpacity, S.g.focusStrength, TONE_VARS.map(([k]) => S.g[k])]);
   let lastB = sigBuild(), lastL = sigLook();
+  applyToneVars();
   onSettings(() => {
+    applyToneVars();
     const b = sigBuild(), l = sigLook();
     if (E.P.on && (b !== lastB || l !== lastL)) E.restyle(b !== lastB);
     if (b !== lastB && flowActive()) voiceSetScript(analyze(localStage() ? E.P.body : (CUR.s ? CUR.s.body : ''), S.g));

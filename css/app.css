@@ -56,7 +56,7 @@ code{font:13px ui-monospace,Menlo,Consolas,monospace;background:#0a0c0f;border:1
 .hint .linkbtn{padding:0}
 
 /* ---------- metin ---------- */
-.title-row{display:grid;grid-template-columns:1fr 240px;gap:10px;margin-bottom:10px}
+.title-row{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:10px}
 .title-in,.folder-in{background:#0a0c0f;border:1px solid var(--line);border-radius:10px;padding:10px 12px;outline:none;min-width:0}
 .title-in{font-size:18px;font-weight:600}
 .title-in:focus,.folder-in:focus{border-color:rgba(166,220,242,.6)}
@@ -197,7 +197,8 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:0;height:22px;cur
 .liblist li{display:flex;gap:8px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:10px 10px 10px 12px;background:#11151a}
 .liblist li.cur{border-color:rgba(226,170,44,.6)}
 .liblist li.empty{color:var(--muted);border-style:dashed;justify-content:center}
-.li-main{flex:1;min-width:0;cursor:pointer;display:flex;flex-direction:column;gap:2px}
+.li-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.li-open{cursor:pointer;display:flex;flex-direction:column;gap:2px;min-width:0}
 .li-main b{font-size:14.5px}
 .li-main small{color:var(--muted);font-size:12px}
 .li-pv{font-size:12.5px;color:#aab4bf;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
@@ -432,3 +433,78 @@ select.txt{appearance:auto}
 .para.nt{color:var(--nt,#a6dcf2)}
 .tk.hold,.tk.br{color:var(--mk,#7f8a96)}
 .k-doc .para.hd,.pv .para.hd{color:#e2aa2c}
+
+/* ---- Açılır kutular ---- */
+.card.fold>.card-h{cursor:pointer;margin-bottom:0;user-select:none;flex-wrap:nowrap}
+.card.fold>.card-h h2{display:flex;align-items:baseline;gap:4px;min-width:0;flex:1;outline:none;flex-wrap:wrap;row-gap:2px}
+.card.fold>.card-h h2:focus-visible{text-decoration:underline;text-underline-offset:4px}
+.card.fold .sum{margin-left:10px;font-size:12.5px;letter-spacing:0;text-transform:none;font-weight:500;color:#7c8794;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;transition:opacity .3s}
+.card.fold.open .sum{opacity:0}
+.card.fold .chev{flex:none;width:28px;height:28px;border-radius:8px;display:grid;place-items:center;transition:background .2s}
+.card.fold .chev::before{content:"";width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:translateY(-2px) rotate(45deg);transition:transform .45s cubic-bezier(.2,.8,.2,1)}
+.card.fold>.card-h:hover .chev{background:var(--panel2)}
+.card.fold.open .chev::before{transform:translateY(2px) rotate(225deg)}
+.card.fold .card-h .linkbtn,.card.fold .card-h .tog,.card.fold .card-h #miniInfo,.card.fold .card-h #yaziTgt{transition:opacity .3s}
+.card.fold:not(.open) .card-h .linkbtn,.card.fold:not(.open) .card-h .tog,.card.fold:not(.open) .card-h #miniInfo,.card.fold:not(.open) .card-h #yaziTgt{display:none}
+.fold-body{display:grid;grid-template-rows:0fr;transition:grid-template-rows .5s cubic-bezier(.2,.8,.2,1)}
+.fold-in{min-height:0;overflow:hidden;opacity:0;transform:translateY(-8px);transition:opacity .25s ease,transform .35s ease}
+.card.fold.open .fold-body{grid-template-rows:1fr}
+.card.fold.open .fold-in{opacity:1;transform:none;transition:opacity .45s ease .12s,transform .5s cubic-bezier(.2,.8,.2,1) .08s;padding-top:14px}
+.card.fold.shown .fold-in{overflow:visible}
+.card.fold:not(.open) .fold-in{padding-top:0;transition:opacity .2s ease,transform .3s ease,padding-top .5s ease}
+@media (prefers-reduced-motion:reduce){ .fold-body,.fold-in,.card.fold .chev::before{transition:none!important} }
+@media (max-width:640px){ .card.fold .sum{display:block;margin-left:0;width:100%} }
+
+/* ---- Okunuş çizgileri ---- */
+:root{--tn-slow:#ff5a5f;--tn-fast:#4cd964;--tn-calm:#b9a3f5;--tn-excited:#4aa3ff}
+/* kesintisiz çizgi: her kelime kutusunun altına tek parça şerit (harf harf solma rengini etkilemez) */
+.tn{background-image:linear-gradient(var(--tc),var(--tc));background-repeat:no-repeat;background-size:100% max(2px,.055em);background-position:0 calc(100% - .1em)}
+.tn-slow{--tc:var(--tn-slow)} .tn-fast{--tc:var(--tn-fast)} .tn-calm{--tc:var(--tn-calm)} .tn-excited{--tc:var(--tn-excited)}
+.tn-dot{display:inline-block;width:18px;height:3px;border-radius:2px;margin-right:8px;vertical-align:middle}
+.tn-dot.tn-slow{background:var(--tn-slow)} .tn-dot.tn-fast{background:var(--tn-fast)} .tn-dot.tn-calm{background:var(--tn-calm)} .tn-dot.tn-excited{background:var(--tn-excited)}
+
+/* ---- Açılır menü ---- */
+.dd{position:relative;display:inline-flex}
+.dd-menu{position:absolute;z-index:60;top:calc(100% + 6px);right:0;min-width:180px;background:#1b2027;border:1px solid #333c47;border-radius:12px;padding:6px;box-shadow:0 14px 40px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:2px;animation:ddIn .16s ease-out}
+.dd-menu button{background:none;border:0;text-align:left;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13.5px;display:flex;align-items:center;white-space:nowrap}
+.dd-menu button:hover{background:var(--panel2)}
+.dd-menu button.on{color:var(--accent);font-weight:650}
+.dd-h{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:4px 10px 6px}
+.dd-new{display:flex;gap:6px;padding:6px 4px 2px;border-top:1px solid var(--line);margin-top:4px}
+.dd-new .txt{flex:1;min-width:0;padding:6px 8px;font-size:13px}
+@keyframes ddIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.fold-menu{position:absolute;top:0;left:0;right:auto;width:240px;max-height:300px;overflow:auto}
+
+/* ---- Metinlerim: sıralama, klasörler, favoriler ---- */
+.drawer{position:relative}
+.lib-tools{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.lib-tools select{flex:1;padding:6px 8px}
+.lib-folders{border:1px solid var(--line);border-radius:12px;background:#11151a}
+.lf-head{width:100%;display:flex;align-items:center;gap:8px;background:none;border:0;padding:9px 12px;cursor:pointer;font-size:13.5px;text-align:left}
+.lf-head span{flex:1}
+.lf-head small{color:var(--muted)}
+.lf-head .chev::before{content:"";display:block;width:7px;height:7px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:translateY(-2px) rotate(45deg);transition:transform .4s cubic-bezier(.2,.8,.2,1)}
+.lib-folders.open .lf-head .chev::before{transform:translateY(2px) rotate(225deg)}
+.lf-body{display:grid;grid-template-rows:0fr;transition:grid-template-rows .45s cubic-bezier(.2,.8,.2,1)}
+.lf-in{min-height:0;overflow:hidden;opacity:0;transition:opacity .25s}
+.lib-folders.open .lf-body{grid-template-rows:1fr}
+.lib-folders.open .lf-in{opacity:1;transition:opacity .4s ease .1s}
+.lf-list{list-style:none;margin:0;padding:0 8px;display:flex;flex-direction:column;gap:2px;max-height:34vh;overflow:auto}
+.lf-list li{display:flex;align-items:center;gap:2px;border-radius:8px}
+.lf-list li.on{background:rgba(226,170,44,.12)}
+.lf-list li.on .lf-pick{color:var(--accent);font-weight:650}
+.lf-list .lf-empty{padding:6px 4px;font-size:12.5px}
+.lf-pick{flex:1;display:flex;justify-content:space-between;gap:8px;background:none;border:0;padding:7px 6px;cursor:pointer;text-align:left;font-size:13.5px;min-width:0}
+.lf-pick span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lf-pick small{color:var(--muted)}
+.lf-x{background:none;border:0;color:var(--muted);cursor:pointer;width:28px;height:28px;border-radius:7px;font-size:14px}
+.lf-x:hover{background:var(--panel2);color:var(--text)}
+.lf-rin{flex:1;padding:5px 8px;font-size:13px}
+.lf-new{display:flex;gap:6px;padding:8px}
+.lf-new .txt{flex:1;min-width:0;padding:6px 8px;font-size:13px}
+.lf-active{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;padding:2px 4px}
+.li-tags{display:flex;align-items:center;gap:6px}
+.li-fav,.li-fold{background:none;border:1px solid transparent;border-radius:8px;cursor:pointer;padding:2px 6px;font-size:15px;line-height:1.2;color:#6b7682;display:inline-flex;align-items:center;gap:5px}
+.li-fav:hover,.li-fold:hover{border-color:var(--line);background:var(--panel2)}
+.li-fav.on{color:var(--accent)}
+.li-fold span{font-size:12px;color:#aab4bf;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

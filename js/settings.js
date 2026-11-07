@@ -1,5 +1,6 @@
 import { lsGet, lsSet, rid, debounce } from './util.js';
 import { sb } from './supa.js';
+import { TONES } from './text.js';
 
 export const FONTS = [
   {id:'inter',        name:'Inter',        fam:'"P Inter"'},
@@ -25,6 +26,7 @@ export const SHOW_ITEMS = [
   ['heads','Bölüm başlıkları', '# ile başlayan satırlar'],
   ['emph','Vurgu rengi', '**vurgu** kapalıysa normal yazı gibi görünür'],
   ['marks','Durak ‖ ve nefes / işaretleri', 'kapalıyken duraklar yine uygulanır'],
+  ['tones','Okunuş çizgileri', 'yavaş, hızlı, sakin, heyecanlı'],
   ['uline','Okuma alt çizgisi', ''],
   ['arrows','Okuma okları', ''],
   ['focus','Odak karartması', ''],
@@ -48,7 +50,8 @@ export const DEF_G = {
   fadeWidth:6, readTone:0.45, readOpacity:0.6,
   pauseOn:true, pauseScale:1, lead:1, focusStrength:0.55,
   followLead:1, followAuto:true,
-  countdown:true, fullscreen:true, boostMul:3,
+  countdown:true, fullscreen:true, boostMul:3, folders:[],
+  ...Object.fromEntries(TONES.map(t => [t[3], t[5]])),
   gateDb:-45, gateHold:0.9, stickL:'speed', stickR:'scrub', autoClean:false,
 };
 export const ACTIONS = [
@@ -137,6 +140,7 @@ function normalize(d){
   const g = Object.assign({}, DEF_G, d.g || {});
   if (!FONTS.some(f => f.id === g.font)) g.font = DEF_G.font;
   if (!MODES.some(m => m[0] === g.mode)) g.mode = 'fixed';
+  g.folders = Array.isArray(g.folders) ? g.folders.filter(f => typeof f === 'string' && f.trim()) : [];
   const profiles = {};
   for (const k in DEF_PROFILE) profiles[k] = normProfile(k, (d.profiles || {})[k]);
   const binds = {};

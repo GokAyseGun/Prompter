@@ -4,7 +4,7 @@
    Lider ekran komutları işler; diğer ekranlar liderin durumunu izler. */
 import { clamp, fmtTime, num, hexRgb, debounce } from './util.js';
 import { S, DEV, prof, fontOf, MODES, setG } from './settings.js';
-import { analyze, speedText } from './text.js';
+import { analyze, speedText, TONE_VARS } from './text.js';
 
 const el = {};
 export const P = {
@@ -58,9 +58,14 @@ function build(body){
     if (p.hidden) d.hidden = true;
     p.tokens.forEach((ti, k) => {
       const t = A.tokens[ti];
-      if (k) d.appendChild(document.createTextNode(' '));
+      const tn = sh.tones && t.tone ? ' tn tn-' + t.tone : '';
+      if (k) {
+        const prev = A.tokens[p.tokens[k - 1]];
+        if (tn && prev.tone === t.tone) { const sp = document.createElement('span'); sp.className = 'tn tn-' + t.tone; sp.textContent = ' '; d.appendChild(sp); }
+        else d.appendChild(document.createTextNode(' '));
+      }
       const s = document.createElement('span');
-      s.className = 'tk' + (t.kind === 'hold' ? ' hold' : t.kind === 'b' ? ' br' : '') + (t.kind !== 'w' && !sh.marks ? ' hide' : '');
+      s.className = 'tk' + (t.kind === 'hold' ? ' hold' : t.kind === 'b' ? ' br' : '') + (t.kind !== 'w' && !sh.marks ? ' hide' : '') + tn;
       for (const ch of t.chars) {
         const e = document.createElement('span'); e.textContent = ch.ch;
         let c = 0;
@@ -88,6 +93,7 @@ function applyStyle(){
   P.tone = Math.round(255 * g.readTone);
   P.base = [hexRgb(g.textColor), hexRgb(g.emphColor), hexRgb(g.noteColor), hexRgb(g.markColor), hexRgb(g.markColor)];
   el.content.style.setProperty('--mk', g.markColor); el.content.style.setProperty('--nt', g.noteColor);
+  for (const [k, v] of TONE_VARS) el.content.style.setProperty(v, g[k]);
   el.uline.style.opacity = el.arL.style.opacity = el.arR.style.opacity = g.lineOpacity;
   el.uline.hidden = !sh.uline;
   el.arL.hidden = el.arR.hidden = !sh.arrows;
@@ -115,9 +121,14 @@ function layout(){
   const fs = pr.size * 96 / 72, pad = Math.round(P.W * pr.margin / 100);
   P.fs = fs;
   el.content.style.fontSize = fs + 'px';
-  el.content.style.padding = `${Math.round(fs * 0.35)}px ${pad}px ${Math.round(P.H)}px`;
   P.anchor = Math.round(P.H * pr.anchor / 100);
-  el.count.style.top = P.anchor + 'px';
+  // İlk satır baştan okuma çizgisi hizasında dursun (çizgi görünür olsun olmasın)
+  const padTop = Math.max(Math.round(fs * 0.35), Math.round(P.anchor - fs * pr.lineHeight / 2));
+  el.content.style.padding = `${padTop}px ${pad}px ${Math.round(P.H)}px`;
+  // geri sayım ilk satırın üstündeki boşlukta görünsün, yazının üstüne binmesin
+  const above = Math.max(0, P.anchor - fs * pr.lineHeight / 2);
+  el.count.style.top = Math.round(above / 2) + 'px';
+  el.count.style.fontSize = Math.round(Math.max(36, Math.min(Math.min(P.W, P.H) * 0.24, above * 0.8))) + 'px';
   const ar = Math.max(10, Math.round(fs * 0.22));
   for (const a of [el.arL, el.arR]) { a.style.borderTopWidth = a.style.borderBottomWidth = ar + 'px'; }
   el.arL.style.borderLeftWidth = el.arR.style.borderRightWidth = Math.round(ar * 1.3) + 'px';
@@ -465,7 +476,7 @@ export function start({body, scriptId = null, title = '', targetSec = null, star
     if (!P.on) return;
     layout(); if (startChar > 0) seek(charToU(startChar), false);
     if (!calibrate && lead && autoplay) {
-      if (S.g.countdown) { P.counting = true; P.countEnd = performance.now() + 3000; el.count.hidden = false; el.count.textContent = '3'; }
+      if (S.g.countdown) { P.counting = true; P.countEnd = performance.now() + 5000; el.count.hidden = false; el.count.textContent = '5'; }
       else P.playing = true;
     }
     updateHud(); updateCtl(); H.onChange();

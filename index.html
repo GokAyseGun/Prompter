@@ -54,8 +54,6 @@
       </div>
       <div class="title-row">
         <input id="titleIn" class="title-in" type="text" placeholder="Metin başlığı" maxlength="140" autocomplete="off">
-        <input id="folderIn" class="folder-in" type="text" placeholder="Klasör (isteğe bağlı)" list="folderList" maxlength="60" autocomplete="off">
-        <datalist id="folderList"></datalist>
       </div>
       <div class="toolbar">
         <div class="tgroup">
@@ -70,6 +68,15 @@
           <button class="btn sm" data-mk="br" type="button" title="Nefes işareti: /">/ Nefes</button>
           <button class="btn sm" data-mk="h" type="button" title="Bölüm başlığı: # Başlık"># Bölüm</button>
           <button class="btn sm" data-mk="n" type="button" title="Okunmayan not: // not">// Not</button>
+          <div class="dd" id="toneDD">
+            <button class="btn sm" id="toneBtn" type="button" title="Seçili kısmın nasıl okunacağını işaretler (hızı etkilemez)" aria-haspopup="true">Okunuş ▾</button>
+            <div class="dd-menu" id="toneMenu" hidden>
+              <button type="button" data-tone="YAVAŞ"><i class="tn-dot tn-slow"></i>Yavaş</button>
+              <button type="button" data-tone="HIZLI"><i class="tn-dot tn-fast"></i>Hızlı</button>
+              <button type="button" data-tone="SAKİN"><i class="tn-dot tn-calm"></i>Sakin</button>
+              <button type="button" data-tone="HEYECANLI"><i class="tn-dot tn-excited"></i>Heyecanlı</button>
+            </div>
+          </div>
           <button class="btn sm ghost" id="helpBtn" type="button" title="İşaretler nasıl kullanılır">?</button>
         </div>
       </div>
@@ -88,9 +95,10 @@
     <section class="card"><div class="card-h"><h2><b>2</b>Ekran</h2></div><div id="fEkran"></div></section>
     <section class="card"><div class="card-h"><h2><b>3</b>Yazı</h2><span class="hint" style="margin:0" id="yaziTgt"></span></div><div id="fYazi"></div></section>
     <section class="card"><div class="card-h"><h2><b>4</b>Akış</h2></div><div id="fAkis"></div></section>
+    <section class="card"><div class="card-h"><h2><b>5</b>Ekranda Görünenler</h2></div><div id="fGorunen"></div></section>
 
     <section class="card">
-      <div class="card-h"><h2><b>5</b>Önizleme</h2>
+      <div class="card-h"><h2><b>6</b>Önizleme</h2>
         <div class="actions"><span class="hint" style="margin:0" id="miniInfo"></span>
           <label class="tog small inline"><input type="checkbox" id="miniMirror"><span>Aynalı göster</span></label></div></div>
       <div class="mini-wrap"><div class="mini" id="mini"></div></div>
@@ -98,14 +106,14 @@
     </section>
 
     <section class="card">
-      <div class="card-h"><h2><b>6</b>Tuş atama</h2><button class="linkbtn" id="resetBinds" type="button">Varsayılan tuşlara dön</button></div>
+      <div class="card-h"><h2><b>7</b>Tuş atama</h2><button class="linkbtn" id="resetBinds" type="button">Varsayılan tuşlara dön</button></div>
       <div class="binds" id="binds"></div>
       <div id="fSticks"></div>
       <p class="hint">Klavye, fare (sol, sağ, orta, yan tuşlar, tekerlek) veya PS / USB / Bluetooth kontrolcü atanabilir; bir eyleme birden çok tuş verilebilir. Tuşlar hangi cihaza bağlıysa (Prompter, Ekran veya Kumanda) akışı oradan yönetir. Kontrolcüyü tarayıcı, üzerinde bir tuşa basılınca görür.</p>
     </section>
 
     <section class="card">
-      <div class="card-h"><h2><b>7</b>Kumanda ve cihazlar</h2></div>
+      <div class="card-h"><h2><b>8</b>Kumanda ve cihazlar</h2></div>
       <div class="remote-grid">
         <div>
           <div class="qr-box">
@@ -153,6 +161,7 @@
       <div id="ekMic"></div>
     </section>
     <section class="card"><div class="card-h"><h2>Ekran ayarları</h2></div><div id="ekForm"></div></section>
+    <section class="card"><div class="card-h"><h2>Ekranda görünenler</h2></div><div id="ekGorunen"></div></section>
     <section class="card"><div class="card-h"><h2>Yazı</h2></div><div id="ekYazi"></div></section>
   </main>
 </div>
@@ -168,7 +177,7 @@
     <div id="kmRemote" class="km-remote"></div>
     <div id="kmSettings" class="km-settings" hidden>
       <div class="seg km-sub">
-        <button type="button" data-ks="metin" class="on">Metin</button><button type="button" data-ks="akis">Akış</button><button type="button" data-ks="ekran">Ekran</button>
+        <button type="button" data-ks="metin" class="on">Metin</button><button type="button" data-ks="akis">Akış</button><button type="button" data-ks="ekran">Ekran</button><button type="button" data-ks="gorunen">Görünenler</button>
         <button type="button" data-ks="yazi">Yazı</button><button type="button" data-ks="tuslar">Tuşlar</button><button type="button" data-ks="cihazlar">Cihazlar</button>
       </div>
       <section class="card" data-ksec="metin">
@@ -178,6 +187,7 @@
       </section>
       <section class="card" data-ksec="akis" hidden><div id="kmAkis"></div></section>
       <section class="card" data-ksec="ekran" hidden><div id="kmEkran"></div></section>
+      <section class="card" data-ksec="gorunen" hidden><div id="kmGorunen"></div></section>
       <section class="card" data-ksec="yazi" hidden><div id="kmYazi"></div></section>
       <section class="card" data-ksec="tuslar" hidden><div class="binds" id="kmBinds"></div><div id="kmSticks"></div></section>
       <section class="card" data-ksec="cihazlar" hidden>
@@ -208,7 +218,21 @@
   <div class="modal-box drawer" role="dialog" aria-modal="true">
     <div class="drawer-h"><h3>Metinlerim</h3><button class="btn sm ghost" data-close type="button">Kapat</button></div>
     <input id="libSearch" class="txt" type="search" placeholder="Başlıkta veya metinde ara…" autocomplete="off">
-    <div class="chips folders" id="libFolders"></div>
+    <div class="lib-tools">
+      <label for="libSort">Sırala</label>
+      <select id="libSort" class="txt">
+        <option value="fav">Favoriler</option><option value="name">Ad</option><option value="date">Tarih</option><option value="recent">Son kullanılanlar</option><option value="dur">Süre</option>
+      </select>
+      <button class="btn sm ghost" id="libDir" type="button" title="Sıralama yönü">↓</button>
+    </div>
+    <div class="lib-folders" id="libFoldersBox">
+      <button type="button" class="lf-head" id="lfHead"><span>📁 Klasörler</span><small id="lfInfo"></small><i class="chev"></i></button>
+      <div class="lf-body"><div class="lf-in">
+        <ul class="lf-list" id="lfList"></ul>
+        <div class="lf-new"><input id="lfNew" class="txt" type="text" maxlength="60" placeholder="Yeni klasör adı" autocomplete="off"><button class="btn sm" id="lfAdd" type="button">+ Ekle</button></div>
+      </div></div>
+    </div>
+    <div class="lf-active" id="lfActive" hidden></div>
     <ul class="liblist" id="libList"></ul>
   </div>
 </div>
@@ -254,6 +278,7 @@
       <tr><td><code>**önemli kelime**</code></td><td>Vurgu, seçtiğiniz vurgu renginde görünür.</td></tr>
       <tr><td><code>[DUR]</code> · <code>[DUR 2]</code></td><td>Elle durak: akış 1 sn (veya yazılan saniye kadar) bekler.</td></tr>
       <tr><td><code>/</code></td><td>Nefes işareti: kısa bir durak.</td></tr>
+      <tr><td><code>[YAVAŞ]…[/YAVAŞ]</code><br><code>[HIZLI]</code> <code>[SAKİN]</code> <code>[HEYECANLI]</code></td><td>Okunuş işareti: akışta o kısmın altında renkli çizgi görünür (yavaş kırmızı, hızlı yeşil, sakin lavanta, heyecanlı mavi). Hızı ve durakları değiştirmez; yalnızca hatırlatır. Okunuş düğmesi seçili kısmın başına ve sonuna ekler.</td></tr>
     </table>
     <p class="hint">Butonlar seçili metni vurgular ya da imlecin olduğu yere işaret ekler.</p>
   </div>
