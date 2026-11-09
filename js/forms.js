@@ -55,22 +55,13 @@ export function gorunenHTML(withTarget = true){
   ${R('lead', 'data-g', 'Alt satıra erken geçiş', 0, 3, 0.25)}
   <p class="hint" style="margin-top:4px">Çizgi okunan satırın altında onunla birlikte çıkar; son heceye bu kadar kala alt satıra geçer.</p>
   ${R('focusStrength', 'data-g', 'Odak karartma gücü', 0.1, 0.95, 0.05)}
-  <div class="subhead">Okunuş çizgileri</div>
-  <p class="hint" style="margin-top:0">Metinde Okunuş düğmesiyle işaretlenen kısımların altında akışta görünür. Hızı ve durakları etkilemez.</p>
-  ${TONES.map(t => `<div class="field"><div class="fh"><span>${t[2]}</span></div>
-    <div class="seg colors" data-g="${t[3]}">${TONE_PRESETS[t[3]].map(([c, n]) => `<button type="button" data-v="${c}"><i style="background:${c}"></i>${n}</button>`).join('')}
-      <label class="colorpick" title="Özel renk"><input type="color" data-gc="${t[3]}"></label></div></div>`).join('')}
   <div class="subhead">Başlangıç</div>
   ${T('countdown', 'data-g', '5-4-3-2-1 geri sayım')}
   ${T('fullscreen', 'data-g', 'Tam ekran aç', 'Ekran kilidi de otomatik engellenir')}`;
 }
-export function yaziHTML(){
+export function renklerHTML(){
   return `
-  <div class="fh"><span>Yazı tipi</span></div>
-  <div class="seg fontgrid" data-g="font">${FONTS.map(f => `<button type="button" data-v="${f.id}" style="font-family:${f.fam.replace(/"/g, "'")}"><b>${f.name}</b><small>Ağ Şiş İı Çö Ğü</small></button>`).join('')}</div>
-  <div class="field"><div class="fh"><span>Yazı şekli</span></div><div class="seg weights" data-g="weight" data-num>${WEIGHTS.map(([w, n]) => `<button type="button" data-v="${w}">${n}</button>`).join('')}</div></div>
-  ${T('italic', 'data-g', 'İtalik')}
-  <div class="field"><div class="fh"><span>Hizalama</span></div>${SEG('align', 'data-g', [['left','Sola'],['center','Ortaya']])}</div>
+  <div class="subhead" style="margin-top:0">Metin ve işaretler</div>
   <div class="field"><div class="fh"><span>Yazı rengi</span></div>
     <div class="seg colors" data-g="textColor">
       <button type="button" data-v="#ffffff"><i style="background:#fff"></i>Beyaz</button>
@@ -95,6 +86,19 @@ export function yaziHTML(){
       <button type="button" data-v="#8d99a7"><i style="background:#8d99a7"></i>Gri</button>
       <button type="button" data-v="#9be7a8"><i style="background:#9be7a8"></i>Yeşil</button>
       <label class="colorpick" title="Özel renk"><input type="color" data-gc="noteColor"></label></div></div>
+  <div class="subhead">Okunuş çizgileri</div>
+  <p class="hint" style="margin-top:0">Metinde Okunuş düğmesiyle işaretlenen kısımların altında akışta görünür. Hızı ve durakları etkilemez.</p>
+  ${TONES.map(t => `<div class="field"><div class="fh"><span>${t[2]}</span></div>
+    <div class="seg colors" data-g="${t[3]}">${TONE_PRESETS[t[3]].map(([c, n]) => `<button type="button" data-v="${c}"><i style="background:${c}"></i>${n}</button>`).join('')}
+      <label class="colorpick" title="Özel renk"><input type="color" data-gc="${t[3]}"></label></div></div>`).join('')}`;
+}
+export function yaziHTML(){
+  return `
+  <div class="fh"><span>Yazı tipi</span></div>
+  <div class="seg fontgrid" data-g="font">${FONTS.map(f => `<button type="button" data-v="${f.id}" style="font-family:${f.fam.replace(/"/g, "'")}"><b>${f.name}</b><small>Ağ Şiş İı Çö Ğü</small></button>`).join('')}</div>
+  <div class="field"><div class="fh"><span>Yazı şekli</span></div><div class="seg weights" data-g="weight" data-num>${WEIGHTS.map(([w, n]) => `<button type="button" data-v="${w}">${n}</button>`).join('')}</div></div>
+  ${T('italic', 'data-g', 'İtalik')}
+  <div class="field"><div class="fh"><span>Hizalama</span></div>${SEG('align', 'data-g', [['left','Sola'],['center','Ortaya']])}</div>
   <p class="hint">Aşağıdakiler ekran tipine özgüdür:</p>
   ${R('size', 'data-p', 'Metin boyutu', 14, 200, 1)}
   ${R('lineHeight', 'data-p', 'Satır aralığı', 0.9, 2.6, 0.05)}

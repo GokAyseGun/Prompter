@@ -10,7 +10,7 @@ import { wireBinds, renderBinds, wireGlobalInput, wireStageMouse, setHandler, po
 import * as E from './engine.js';
 import { V, startMic, stopMic, readLevel, tick as voiceTick, setMode as voiceSetMode, setScript as voiceSetScript, stopAll as voiceStopAll, micActive, estimate as voiceEstimate, resetFollow, logStart, logStop, logSample, LOG } from './voice.js';
 import { createLink } from './link.js';
-import { ekranHTML, yaziHTML, akisHTML, sticksHTML, gorunenHTML, bindForm, tickMeters, setAvgSylSource } from './forms.js';
+import { ekranHTML, yaziHTML, akisHTML, sticksHTML, gorunenHTML, renklerHTML, bindForm, tickMeters, setAvgSylSource } from './forms.js';
 import { mountRemote, mountDoc } from './remote.js';
 
 const SAMPLE = 'Merhaba, bu bir önizleme metnidir. Okunan kelimeler **harf harf** yavaşça griye döner ve solar; sıradaki kelimeler parlak kalır. Çağrı, şükür, ılık rüzgâr, İğneada, Ödül ve Ünal gibi Türkçe karakterler sorunsuz görünür.';
@@ -818,7 +818,7 @@ function makeFolds(){
       const open = !card.classList.contains('open');
       card.classList.toggle('open', open); card.classList.remove('shown'); h2.setAttribute('aria-expanded', String(open));
       clearTimeout(card._shownT);
-      if (open) { card._shownT = setTimeout(() => { if (card.classList.contains('open')) card.classList.add('shown'); }, 560); if (card.dataset.fold === '6') renderPreview(); }
+      if (open) { card._shownT = setTimeout(() => { if (card.classList.contains('open')) card.classList.add('shown'); }, 560); if (card.dataset.fold === '7') renderPreview(); }
     };
     h.addEventListener('click', e => { if (e.target.closest('button, input, label, select, a, textarea')) return; toggle(); });
     h2.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
@@ -830,12 +830,13 @@ function updateSums(){
   const type = tgtCtx.type(), pr = prof(type), A = curA();
   set('1', CUR.s ? `${CUR.s.title || 'Adsız metin'} · ${A.wc} kelime · ≈ ${fmtTime(durationOf(A, S.g.sps))}` : '');
   set('2', `${PNAME[type] || type} · ${pr.mirror === 'h' ? 'aynalı' : 'düz'} · ${({auto: 'otomatik', landscape: 'yatay', portrait: 'dikey'})[pr.orientation] || ''}`);
-  set('3', `${fontOf(S.g.font).name} · ${((WEIGHTS.find(w => w[0] === +S.g.weight) || [0, ''])[1]).toLocaleLowerCase('tr-TR')} · ${Math.round(pr.size)} pt`);
-  set('4', `${(MODES.find(m => m[0] === S.g.mode) || ['', ''])[1]}${S.g.mode === 'follow' ? '' : ' · ' + num(S.g.sps) + ' hece/sn'}`);
+  set('4', `${fontOf(S.g.font).name} · ${((WEIGHTS.find(w => w[0] === +S.g.weight) || [0, ''])[1]).toLocaleLowerCase('tr-TR')} · ${Math.round(pr.size)} pt`);
+  set('3', `${(MODES.find(m => m[0] === S.g.mode) || ['', ''])[1]}${S.g.mode === 'follow' ? '' : ' · ' + num(S.g.sps) + ' hece/sn'}`);
   set('5', `çizgi %${Math.round(pr.anchor)} · ${SHOW_ITEMS.filter(([k]) => pr.show[k]).length}/${SHOW_ITEMS.length} öğe görünür`);
-  set('6', PNAME[type] || '');
-  set('7', `${ACTIONS.filter(([a]) => (S.binds[a] || []).length).length}/${ACTIONS.length} eylemde tuş`);
-  set('8', PEERS.length ? `${PEERS.length} cihaz bağlı` : 'bağlı cihaz yok');
+  set('6', `yazı, işaret, not ve ${TONE_VARS.length} okunuş rengi`);
+  set('7', PNAME[type] || '');
+  set('8', `${ACTIONS.filter(([a]) => (S.binds[a] || []).length).length}/${ACTIONS.length} eylemde tuş`);
+  set('9', PEERS.length ? `${PEERS.length} cihaz bağlı` : 'bağlı cihaz yok');
 }
 function mountPrompter(){
   $('#vPrompter').hidden = false;
@@ -845,9 +846,10 @@ function mountPrompter(){
   $('#fAkis').innerHTML = akisHTML();
   $('#fSticks').innerHTML = sticksHTML();
   $('#fGorunen').innerHTML = gorunenHTML();
+  $('#fRenk').innerHTML = renklerHTML();
   const after = () => { renderPreviewSoon(); updateEstimate(); updateSums(); $('#yaziTgt').textContent = `Boyut ve aralıklar: ${$('.tgt-sel') ? $('.tgt-sel').selectedOptions[0]?.textContent || '' : ''}`; };
   const ctx = {...tgtCtx, after, onSpeedTest: () => VIEW.openSpeedTest(), keepMic: () => V.on};
-  FORMS.push(bindForm($('#fEkran'), ctx), bindForm($('#fYazi'), ctx), bindForm($('#fAkis'), ctx), bindForm($('#fSticks'), ctx), bindForm($('#fGorunen'), ctx));
+  FORMS.push(bindForm($('#fEkran'), ctx), bindForm($('#fYazi'), ctx), bindForm($('#fAkis'), ctx), bindForm($('#fSticks'), ctx), bindForm($('#fGorunen'), ctx), bindForm($('#fRenk'), ctx));
   renderTgtSelects();
   makeFolds();
   wireEditor(); wireLib(); wireVersions(); wireTakes(); wireSpeedTest();
@@ -942,9 +944,10 @@ function mountEkran(){
   $('#ekForm').innerHTML = ekranHTML();
   $('#ekYazi').innerHTML = yaziHTML();
   $('#ekGorunen').innerHTML = gorunenHTML(false);
+  $('#ekRenk').innerHTML = renklerHTML();
   $('#ekMic').innerHTML = `<div class="fh"><span>Seviye</span><button class="linkbtn mic-test" type="button">Mikrofonu test et</button></div><div class="meter"><div class="meter-fill"></div><div class="meter-th"></div></div>`;
   const selfCtx = {type: () => DEV.profile, setType(t){ DEV.profile = t; saveDevice(); track(); }};
-  FORMS.push(bindForm($('#ekForm'), selfCtx), bindForm($('#ekGorunen'), selfCtx), bindForm($('#ekYazi'), selfCtx), bindForm($('#ekMic'), selfCtx));
+  FORMS.push(bindForm($('#ekForm'), selfCtx), bindForm($('#ekGorunen'), selfCtx), bindForm($('#ekYazi'), selfCtx), bindForm($('#ekRenk'), selfCtx), bindForm($('#ekMic'), selfCtx));
   $('#ekName').value = DEV.name;
   $('#ekName').addEventListener('input', debounce(() => { DEV.name = $('#ekName').value.trim() || 'Ekran'; saveDevice(); track(); }, 500));
   const cal = () => { if (!localStage()) E.start({body: CAL_TEXT, calibrate: true, startChar: 150}); };
@@ -970,10 +973,11 @@ function mountKumanda(){
   $('#kmEkran').innerHTML = ekranHTML() + `<div class="subhead">Önizleme</div><div class="mini-wrap"><div class="mini" id="kmMini"></div></div>`;
   $('#kmYazi').innerHTML = yaziHTML();
   $('#kmGorunen').innerHTML = gorunenHTML();
+  $('#kmRenk').innerHTML = renklerHTML();
   $('#kmSticks').innerHTML = sticksHTML();
   const after = () => renderMini($('#kmMini'), doc.body, false);
   const ctx = {...tgtCtx, after, onSpeedTest: () => note('Hız ölçümü Prompter cihazındadır.')};
-  FORMS.push(bindForm($('#kmAkis'), ctx), bindForm($('#kmEkran'), ctx), bindForm($('#kmGorunen'), ctx), bindForm($('#kmYazi'), ctx), bindForm($('#kmSticks'), ctx));
+  FORMS.push(bindForm($('#kmAkis'), ctx), bindForm($('#kmEkran'), ctx), bindForm($('#kmGorunen'), ctx), bindForm($('#kmYazi'), ctx), bindForm($('#kmRenk'), ctx), bindForm($('#kmSticks'), ctx));
   renderTgtSelects();
   wireBinds($('#kmBinds'));
   for (const b of $$('.km-tabs [data-kt]')) b.addEventListener('click', () => {

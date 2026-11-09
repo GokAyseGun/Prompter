@@ -93,12 +93,13 @@
     </section>
 
     <section class="card"><div class="card-h"><h2><b>2</b>Ekran</h2></div><div id="fEkran"></div></section>
-    <section class="card"><div class="card-h"><h2><b>3</b>Yazı</h2><span class="hint" style="margin:0" id="yaziTgt"></span></div><div id="fYazi"></div></section>
-    <section class="card"><div class="card-h"><h2><b>4</b>Akış</h2></div><div id="fAkis"></div></section>
+    <section class="card"><div class="card-h"><h2><b>3</b>Akış</h2></div><div id="fAkis"></div></section>
+    <section class="card"><div class="card-h"><h2><b>4</b>Yazı</h2><span class="hint" style="margin:0" id="yaziTgt"></span></div><div id="fYazi"></div></section>
     <section class="card"><div class="card-h"><h2><b>5</b>Ekranda Görünenler</h2></div><div id="fGorunen"></div></section>
+    <section class="card"><div class="card-h"><h2><b>6</b>Renkler</h2></div><div id="fRenk"></div></section>
 
     <section class="card">
-      <div class="card-h"><h2><b>6</b>Önizleme</h2>
+      <div class="card-h"><h2><b>7</b>Önizleme</h2>
         <div class="actions"><span class="hint" style="margin:0" id="miniInfo"></span>
           <label class="tog small inline"><input type="checkbox" id="miniMirror"><span>Aynalı göster</span></label></div></div>
       <div class="mini-wrap"><div class="mini" id="mini"></div></div>
@@ -106,14 +107,14 @@
     </section>
 
     <section class="card">
-      <div class="card-h"><h2><b>7</b>Tuş atama</h2><button class="linkbtn" id="resetBinds" type="button">Varsayılan tuşlara dön</button></div>
+      <div class="card-h"><h2><b>8</b>Tuş atama</h2><button class="linkbtn" id="resetBinds" type="button">Varsayılan tuşlara dön</button></div>
       <div class="binds" id="binds"></div>
       <div id="fSticks"></div>
       <p class="hint">Klavye, fare (sol, sağ, orta, yan tuşlar, tekerlek) veya PS / USB / Bluetooth kontrolcü atanabilir; bir eyleme birden çok tuş verilebilir. Tuşlar hangi cihaza bağlıysa (Prompter, Ekran veya Kumanda) akışı oradan yönetir. Kontrolcüyü tarayıcı, üzerinde bir tuşa basılınca görür.</p>
     </section>
 
     <section class="card">
-      <div class="card-h"><h2><b>8</b>Kumanda ve cihazlar</h2></div>
+      <div class="card-h"><h2><b>9</b>Kumanda ve cihazlar</h2></div>
       <div class="remote-grid">
         <div>
           <div class="qr-box">
@@ -161,8 +162,9 @@
       <div id="ekMic"></div>
     </section>
     <section class="card"><div class="card-h"><h2>Ekran ayarları</h2></div><div id="ekForm"></div></section>
-    <section class="card"><div class="card-h"><h2>Ekranda görünenler</h2></div><div id="ekGorunen"></div></section>
     <section class="card"><div class="card-h"><h2>Yazı</h2></div><div id="ekYazi"></div></section>
+    <section class="card"><div class="card-h"><h2>Ekranda görünenler</h2></div><div id="ekGorunen"></div></section>
+    <section class="card"><div class="card-h"><h2>Renkler</h2></div><div id="ekRenk"></div></section>
   </main>
 </div>
 
@@ -177,18 +179,19 @@
     <div id="kmRemote" class="km-remote"></div>
     <div id="kmSettings" class="km-settings" hidden>
       <div class="seg km-sub">
-        <button type="button" data-ks="metin" class="on">Metin</button><button type="button" data-ks="akis">Akış</button><button type="button" data-ks="ekran">Ekran</button><button type="button" data-ks="gorunen">Görünenler</button>
-        <button type="button" data-ks="yazi">Yazı</button><button type="button" data-ks="tuslar">Tuşlar</button><button type="button" data-ks="cihazlar">Cihazlar</button>
+        <button type="button" data-ks="metin" class="on">Metin</button><button type="button" data-ks="ekran">Ekran</button><button type="button" data-ks="akis">Akış</button><button type="button" data-ks="yazi">Yazı</button>
+        <button type="button" data-ks="gorunen">Görünenler</button><button type="button" data-ks="renk">Renkler</button><button type="button" data-ks="tuslar">Tuşlar</button><button type="button" data-ks="cihazlar">Cihazlar</button>
       </div>
       <section class="card" data-ksec="metin">
         <div class="k-scripts"><select id="kmScript" class="txt"></select>
           <div class="actions"><button class="btn primary" id="kmStart" type="button">▶ Başlat</button><button class="btn" id="kmResume" type="button" hidden>Kaldığı yerden</button></div></div>
         <div class="k-text" id="kmDoc"></div>
       </section>
-      <section class="card" data-ksec="akis" hidden><div id="kmAkis"></div></section>
       <section class="card" data-ksec="ekran" hidden><div id="kmEkran"></div></section>
-      <section class="card" data-ksec="gorunen" hidden><div id="kmGorunen"></div></section>
+      <section class="card" data-ksec="akis" hidden><div id="kmAkis"></div></section>
       <section class="card" data-ksec="yazi" hidden><div id="kmYazi"></div></section>
+      <section class="card" data-ksec="gorunen" hidden><div id="kmGorunen"></div></section>
+      <section class="card" data-ksec="renk" hidden><div id="kmRenk"></div></section>
       <section class="card" data-ksec="tuslar" hidden><div class="binds" id="kmBinds"></div><div id="kmSticks"></div></section>
       <section class="card" data-ksec="cihazlar" hidden>
         <ul class="devlist" id="kmDevList"></ul>
