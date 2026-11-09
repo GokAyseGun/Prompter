@@ -32,6 +32,27 @@ export function ekranHTML(){
   ${R('cropBottom', 'data-p', 'Alttan kırp', 0, 45, 0.5)}
   ${R('cropSide', 'data-p', 'Yanlardan kırp', 0, 35, 0.5)}
   <p class="hint">Yazı yalnızca camda görünen alanda akar. Ekran hazırda beklerken bu alanın çerçevesini gösterir; camdan bakarak ayarlayın.</p>
+  <div class="subhead">Cam düzeltmesi</div>
+  ${R('geoY', 'data-p', 'Uzunluk (harfleri yukarı-aşağı uzat)', 100, 160, 1)}
+  ${R('geoX', 'data-p', 'Genişlik (harfleri sağa-sola aç)', 70, 130, 1)}
+  ${R('geoK', 'data-p', 'Eğim (üst ve alt genişlik farkı)', -25, 25, 0.5)}
+  ${R('bright', 'data-p', 'Parlaklık', 30, 100, 1)}
+  ${T('calPattern', 'data-p', 'Kalibrasyon desenini göster', 'Bu ekran tipindeki bekleyen ekranlarda daire, kare ve ızgara görünür; buradan ayarlarken camdan bakın')}
+  <div class="fh" style="gap:16px;justify-content:flex-start"><button class="linkbtn cal-here" type="button">Bu cihazda kalibrasyonu aç</button><button class="linkbtn geo-reset" type="button">Cam düzeltmesini sıfırla</button></div>
+  <details class="calhelp"><summary>Kalibrasyon nasıl yapılır?</summary><ol>
+    <li>Önce donanım: cam 45°, ekran düz, gözünüz objektif hizasında ve ortada.</li>
+    <li><b>Eğim:</b> karenin sağ ve sol kenarları birbirine paralel olana kadar.</li>
+    <li><b>Uzunluk:</b> daire, karenin dört kenarına aynı anda değene kadar.</li>
+    <li><b>Genişlik:</b> yalnızca yazıyı daha geniş ya da dar istiyorsanız.</li>
+    <li><b>Okuma çizgisi</b> (Ekranda Görünenler): artı işareti objektifin tam önüne gelene kadar.</li>
+    <li>Ekrana bağlı klavyeyle: ↑↓ uzunluk, ←→ eğim, + / − genişlik, Esc kapat.</li></ol></details>
+  <details class="calhelp"><summary>Kurulum kontrol listesi</summary><ul>
+    <li>Kaplamalı prompter camı ya da nötr gümüş (%50 geçirgen) ayna film; düz camda çift görüntü olur.</li>
+    <li>Yansıma sönükse cihazı 90° çevirip <b>Görünüm</b> ayarını değiştirin; ekran ışığı polarize olduğundan bir yön çok daha parlak görünür. Desendeki beyaz şeritle karşılaştırın.</li>
+    <li>Cihazda otomatik parlaklık, gece ışığı ve True Tone kapalı.</li>
+    <li>Işıklar cama değil size dönük; pencere ve tavan ışığı camda yansımasın.</li>
+    <li>Parlaklığı okunabildiği en düşük düzeye indirin; parlama ve objektife düşen yansıma azalır. Gerekirse yazıyı büyütün.</li>
+    <li>Okuma mesafesi: ekranın her inçi için en fazla ~30 cm (6,5" telefon ≈ 2 m, 11" tablet ≈ 3,3 m).</li></ul></details>
   <p class="hint">Okuma çizgisi yüksekliği ve ekranda görünenler <b>Ekranda Görünenler</b> bölümündedir.</p>
   <button class="linkbtn reset-prof" type="button">Bu ekran tipini varsayılana döndür</button>`;
 }
@@ -153,7 +174,8 @@ const MODE_HINT = {
 let avgSylFn = () => 2.8;
 export const setAvgSylSource = fn => { avgSylFn = fn; };
 const FMT = {
-  anchor: v => '%' + Math.round(v), cropTop: v => '%' + num(v, 1), cropBottom: v => '%' + num(v, 1), cropSide: v => '%' + num(v, 1),
+  anchor: v => '%' + Math.round(v), geoY: v => '%' + Math.round(v), geoX: v => '%' + Math.round(v), bright: v => '%' + Math.round(v),
+  geoK: v => v === 0 ? 'düz' : (v > 0 ? 'üst geniş ' : 'alt geniş ') + '%' + num(Math.abs(v), 1), cropTop: v => '%' + num(v, 1), cropBottom: v => '%' + num(v, 1), cropSide: v => '%' + num(v, 1),
   size: v => Math.round(v) + ' pt', lineHeight: v => num(v, 2), letter: v => (v > 0 ? '+' : '') + num(v, 2) + ' em',
   margin: v => '%' + num(v, v % 1 ? 1 : 0),
   sps: v => speedText(v, avgSylFn()), fadeWidth: v => Math.round(v) + ' harf',
@@ -230,6 +252,8 @@ export function bindForm(root, ctx){
   root.addEventListener('click', e => {
     const pt = e.target.closest('[data-ptype] button'); if (pt && ctx.setType) { ctx.setType(pt.dataset.v); sync(); return; }
     const sh = e.target.closest('button[data-show]'); if (sh) { setShow(type(), sh.dataset.show, !prof(type()).show[sh.dataset.show]); return; }
+    if (e.target.closest('.cal-here')) { window.dispatchEvent(new CustomEvent('prompter:calhere')); return; }
+    if (e.target.closest('.geo-reset')) { const t = type(); setP(t, 'geoY', 100); setP(t, 'geoX', 100); setP(t, 'geoK', 0); return; }
     if (e.target.closest('.reset-prof')) { resetProfile(type()); note('Ekran tipi varsayılana döndü.'); return; }
     if (e.target.closest('.reset-speed')) { setG('sps', S.g.personalSps || DEF_SPS); return; }
     if (e.target.closest('.speed-test')) { ctx.onSpeedTest && ctx.onSpeedTest(); return; }

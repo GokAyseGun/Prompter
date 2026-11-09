@@ -35,7 +35,8 @@ export const SHOW_ITEMS = [
   ['voice','Ses göstergesi', 'mod, kapı durumu ve mikrofon seviyesi'],
 ];
 const SHOW0 = Object.fromEntries(SHOW_ITEMS.map(([k]) => [k, true]));
-const P0 = {lineHeight:1.3, letter:0, orientation:'auto', rotateDir:90, mirror:'h', flipV:false, anchor:45, cropTop:0, cropBottom:0, cropSide:0};
+const P0 = {lineHeight:1.3, letter:0, orientation:'auto', rotateDir:90, mirror:'h', flipV:false, anchor:45, cropTop:0, cropBottom:0, cropSide:0,
+  geoY:100, geoX:100, geoK:0, bright:100, calPattern:false};   // cam düzeltmesi: uzunluk %, genişlik %, eğim (üst-alt genişlik farkı %), parlaklık %
 export const DEF_PROFILE = {
   phone:   {...P0, size:30, margin:4},
   tablet:  {...P0, size:46, margin:6},

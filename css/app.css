@@ -104,6 +104,10 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:0;height:22px;cur
 .tog input:checked{background:var(--accent)}
 .tog input:checked::after{transform:translateX(17px);background:var(--accent-ink)}
 .tog small{display:block;color:var(--muted);font-size:12px}
+.calhelp{margin:10px 0 4px;font-size:13px;color:var(--muted)}
+.calhelp summary{cursor:pointer;color:var(--text);font-size:13px;padding:4px 0}
+.calhelp ol,.calhelp ul{margin:6px 0 4px;padding-left:20px;line-height:1.55}
+.calhelp li{margin:2px 0}
 .subhead{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px;padding-top:14px;border-top:1px solid var(--line)}
 .voice-box{margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:12px;background:#11151a}
 .meter{position:relative;height:10px;border-radius:6px;background:#232a33;overflow:hidden}
@@ -236,6 +240,10 @@ table.help{width:100%;border-collapse:collapse;font-size:14px}
 #rot{position:absolute;left:50%;top:50%;transform-origin:50% 50%}
 #mir{position:absolute;inset:0;overflow:hidden}
 #area{position:absolute;overflow:hidden}
+#geo{position:absolute;left:0;top:0;transform-origin:0 0}
+#calPat{position:absolute;inset:0;background:#000;cursor:pointer;z-index:5}
+#calPat svg,#calTxt svg{display:block;width:100%;height:100%}
+#calTxt{position:absolute;inset:0;pointer-events:none;z-index:6}
 #content{position:absolute;top:0;left:0;right:0;will-change:transform;overflow-wrap:anywhere;font-kerning:normal;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased}
 .focus{position:absolute;left:0;right:0;pointer-events:none}
 #fTop{top:0}

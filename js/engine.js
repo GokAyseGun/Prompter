@@ -3,12 +3,12 @@
    böylece ekranlar arasında görünürlük farkı olsa da senkron bozulmaz.
    Lider ekran komutları işler; diğer ekranlar liderin durumunu izler. */
 import { clamp, fmtTime, num, hexRgb, debounce } from './util.js';
-import { S, DEV, prof, fontOf, MODES, setG } from './settings.js';
+import { S, DEV, prof, fontOf, MODES, setG, setP } from './settings.js';
 import { analyze, speedText, TONE_VARS } from './text.js';
 
 const el = {};
 export const P = {
-  on:false, cal:false, A:null, chars:[], cls:null, applied:null, tokEls:[], lines:[], knots:[], KI:[], win:1, total:0, u:0,
+  on:false, cal:false, forcePat:false, A:null, chars:[], cls:null, applied:null, tokEls:[], lines:[], knots:[], KI:[], win:1, total:0, u:0,
   playing:false, ended:false, counting:false, countEnd:0, holdIdx:0, holdLeft:0,
   scroll:0, off:0, offV:0, W:0, H:0, anchor:0, fs:40, tone:115, base:[], lineH:50,
   boost:0, gain:1, lastH:0, mark:-1, lead:true, syncAdj:0, rateNow:0, fRate:null, jumpSeen:null,
@@ -19,7 +19,7 @@ let H = { onExit(){}, onChange(){}, onProgress(){}, voice: () => null, level: ()
 
 export function initStage(h){
   H = Object.assign(H, h);
-  for (const id of ['stage','rot','mir','area','content','uline','arL','arR','fTop','fBot','frame','clock','vind','vlev','count','hud','stoast','prog','ctl','ctlPlay','ctlInfo','ctlMode','ctlLead'])
+  for (const id of ['stage','rot','mir','area','geo','calPat','calTxt','content','uline','arL','arR','fTop','fBot','frame','clock','vind','vlev','count','hud','stoast','prog','ctl','ctlPlay','ctlInfo','ctlMode','ctlLead'])
     el[id] = document.getElementById(id);
   el.ctl.addEventListener('click', e => {
     const b = e.target.closest('button[data-a]'); if (!b) return;
@@ -36,6 +36,23 @@ export function initStage(h){
     if (e.pointerType !== 'mouse') { showCtl(); H.input ? H.input('toggle') : action('toggle'); }
   });
   el.stage.addEventListener('pointermove', e => { if (e.pointerType === 'mouse') showCtl(); });
+  el.calPat.addEventListener('click', e => { e.stopPropagation(); closePattern(); });
+  // Kalibrasyon deseni açıkken klavye: ↑↓ uzunluk, ←→ eğim, + − genişlik, Esc kapat
+  window.addEventListener('keydown', e => {
+    if (!patternOn()) return;
+    const pr = prof(), t = DEV.profile, step = e.shiftKey ? 5 : 1;
+    const put = (k, v, lo, hi) => setP(t, k, Math.round(clamp(v, lo, hi) * 2) / 2);
+    let used = true;
+    if (e.key === 'ArrowUp') put('geoY', pr.geoY + step, 100, 160);
+    else if (e.key === 'ArrowDown') put('geoY', pr.geoY - step, 100, 160);
+    else if (e.key === 'ArrowRight') put('geoK', pr.geoK + step / 2, -25, 25);
+    else if (e.key === 'ArrowLeft') put('geoK', pr.geoK - step / 2, -25, 25);
+    else if (e.key === '+' || e.key === '=') put('geoX', pr.geoX + step, 70, 130);
+    else if (e.key === '-' || e.key === '_') put('geoX', pr.geoX - step, 70, 130);
+    else if (e.key === 'Escape') closePattern();
+    else used = false;
+    if (used) { e.preventDefault(); e.stopImmediatePropagation(); }
+  }, true);
   el.ctl.addEventListener('pointerenter', () => { overCtl = true; });
   el.ctl.addEventListener('pointerleave', () => { overCtl = false; showCtl(); });
   let rT = 0;
@@ -101,6 +118,84 @@ function applyStyle(){
   el.clock.hidden = !sh.clock || P.cal;
   el.prog.hidden = !sh.prog || P.cal;
   el.frame.hidden = !P.cal;
+  el.geo.style.opacity = clamp((pr.bright ?? 100) / 100, 0.3, 1);
+}
+
+/* ---------- cam düzeltmesi ----------
+   Prompter camı 45° dururken göz yansımaya açılı bakarsa harfler basık, cam/ekran eğikse yamuk görünür.
+   Görüntü, okuma çizgisi yerinde kalacak şekilde uzatılır (uzunluk), açılır (genişlik) ve
+   üst-alt genişliği farklılaştırılır (eğim: perspektif dönüşümü). Düzeltme aynalamanın içinde
+   uygulandığından "üst/alt" camda okunan yöne göredir. */
+const patternOn = () => P.on && P.cal && (P.forcePat || !!prof().calPattern);
+function closePattern(){
+  if (P.forcePat) { exit(); return; }
+  setP(DEV.profile, 'calPattern', false);
+}
+function homography(src, dst){
+  // 4 nokta eşlemesinden 3×3 izdüşüm matrisi (h33 = 1)
+  const A = [], b = [];
+  for (let i = 0; i < 4; i++) {
+    const [x, y] = src[i], [u, v] = dst[i];
+    A.push([x, y, 1, 0, 0, 0, -u * x, -u * y]); b.push(u);
+    A.push([0, 0, 0, x, y, 1, -v * x, -v * y]); b.push(v);
+  }
+  for (let c = 0; c < 8; c++) {
+    let m = c; for (let r = c + 1; r < 8; r++) if (Math.abs(A[r][c]) > Math.abs(A[m][c])) m = r;
+    [A[c], A[m]] = [A[m], A[c]]; [b[c], b[m]] = [b[m], b[c]];
+    for (let r = 0; r < 8; r++) {
+      if (r === c) continue;
+      const f = A[r][c] / A[c][c]; if (!f) continue;
+      for (let k = c; k < 8; k++) A[r][k] -= f * A[c][k];
+      b[r] -= f * b[c];
+    }
+  }
+  const h = b.map((v, i) => v / A[i][i]);
+  return [h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], 1];
+}
+function geoTransform(Wg, Hh, Wa, a, sX, sY, k){
+  if (Math.abs(k) < 1e-4) return `matrix(${sX},0,0,${sY},${(Wa - sX * Wg) / 2},${a * (1 - sY)})`;
+  const c = Wa / 2, hT = Wa / 2 * (1 + k), hB = Wa / 2 * (1 - k), yT = a - a * sY, yB = a + (Hh - a) * sY;
+  const h = homography([[0, 0], [Wg, 0], [Wg, Hh], [0, Hh]], [[c - hT, yT], [c + hT, yT], [c + hB, yB], [c - hB, yB]]);
+  // okuma çizgisi (orta noktası) tam yerinde kalsın
+  const x = Wg / 2, w = h[6] * x + h[7] * a + 1, ym = (h[3] * x + h[4] * a + h[5]) / w, dy = a - ym;
+  h[3] += dy * h[6]; h[4] += dy * h[7]; h[5] += dy;
+  const f = v => +v.toFixed(9);
+  return `matrix3d(${f(h[0])},${f(h[3])},0,${f(h[6])},${f(h[1])},${f(h[4])},0,${f(h[7])},0,0,1,0,${f(h[2])},${f(h[5])},0,1)`;
+}
+function drawPattern(){
+  const on = patternOn(); el.calPat.hidden = el.calTxt.hidden = !on;
+  if (!on) { el.calPat.textContent = ''; el.calTxt.textContent = ''; return; }
+  // Desen (ızgara, daire, kare, artı) düzeltmeyle birlikte dönüşür; yazılar ve yön şeridi düzeltmeden bağımsız durur
+  const W = P.W, Hh = P.H, a = P.anchor, cx = W / 2, pr = prof();
+  const r = Math.max(30, Math.min(Hh * 0.3, W * 0.28)), g = r / 3;
+  let grid = '';
+  for (let x = cx % g; x < W; x += g) grid += `M${x.toFixed(1)} 0V${Hh}`;
+  for (let y = a % g; y < Hh; y += g) grid += `M0 ${y.toFixed(1)}H${W}`;
+  el.calPat.innerHTML = `<svg viewBox="0 0 ${W} ${Hh}" xmlns="http://www.w3.org/2000/svg">
+    <path d="${grid}" stroke="rgba(166,220,242,.28)" stroke-width="1" fill="none"/>
+    <path d="M0 ${a}H${W}" stroke="#e2aa2c" stroke-width="2" stroke-dasharray="10 8"/>
+    <path d="M${cx} 0V${Hh}" stroke="rgba(166,220,242,.5)" stroke-width="1.5"/>
+    <rect x="${cx - r}" y="${a - r}" width="${2 * r}" height="${2 * r}" fill="none" stroke="#a6dcf2" stroke-width="2.5"/>
+    <circle cx="${cx}" cy="${a}" r="${r}" fill="none" stroke="#e2aa2c" stroke-width="3"/>
+    <path d="M${cx - r * 0.18} ${a}H${cx + r * 0.18}M${cx} ${a - r * 0.18}V${a + r * 0.18}" stroke="#fff" stroke-width="3"/>
+  </svg>`;
+  const Wt = el.area.clientWidth || W, Ht = el.area.clientHeight || Hh, ct = Wt / 2;
+  const fz = Math.max(13, Math.round(Math.min(Ht * 0.03, Wt * 0.02))), lh = Math.round(fz * 1.45);
+  const sgn = v => (v > 0 ? '+' : '') + num(v, 1);
+  const steps = ['1  Cam 45°, ekran düz, göz objektif hizasında', '2  Eğim: karenin yan kenarları paralel', '3  Uzunluk: daire karenin 4 kenarına değsin',
+    '4  Genişlik: gerekiyorsa', '5  Okuma çizgisi: artı işareti objektifin önünde'];
+  const txt = (x, y, t, o = '') => `<text x="${x}" y="${y}" ${o}>${t}</text>`;
+  const bh = Math.max(8, fz * 0.8), by = Ht - fz * 0.9 - lh - bh, bw = Wt * 0.46;
+  el.calTxt.innerHTML = `<svg viewBox="0 0 ${Wt} ${Ht}" xmlns="http://www.w3.org/2000/svg" font-family="system-ui,sans-serif" font-size="${fz}">
+    <rect x="0" y="0" width="${fz * 25}" height="${fz * 1.6 + lh * 5.6}" fill="rgba(0,0,0,.72)"/>
+    <rect x="${Wt - fz * 24}" y="0" width="${fz * 24}" height="${fz * 1.6 + lh * 1.6}" fill="rgba(0,0,0,.72)"/>
+    <g fill="#e9f3f7">${txt(fz, fz * 1.6, 'KALİBRASYON', 'font-weight="700" letter-spacing="2"')}
+      ${steps.map((t, i) => txt(fz, fz * 1.6 + lh * (i + 1), t, 'fill="#b9c8d3"')).join('')}
+      ${txt(Wt - fz, fz * 1.6, `Uzunluk %${Math.round(pr.geoY)} · Genişlik %${Math.round(pr.geoX)} · Eğim ${sgn(pr.geoK)}`, 'text-anchor="end" fill="#e2aa2c"')}
+      ${txt(Wt - fz, fz * 1.6 + lh, 'Kapatmak için dokunun · Esc', 'text-anchor="end" fill="#8a9aa6"')}</g>
+    <rect x="${ct - bw / 2}" y="${by}" width="${bw}" height="${bh}" fill="#fff"/>
+    ${txt(ct, by + bh + lh, 'Yön testi: cihazı 90° çevirip bu şeridin camdaki parlaklığını karşılaştırın', 'text-anchor="middle" fill="#8a9aa6"')}
+  </svg>`;
 }
 function computeRotation(){
   const vw = window.innerWidth, vh = window.innerHeight, pr = prof();
@@ -117,11 +212,14 @@ function layout(){
   const [W0, H0] = computeRotation(), pr = prof();
   const top = Math.round(H0 * pr.cropTop / 100), bot = Math.round(H0 * pr.cropBottom / 100), side = Math.round(W0 * pr.cropSide / 100);
   el.area.style.inset = `${top}px ${side}px ${bot}px ${side}px`;
-  P.W = W0 - 2 * side; P.H = H0 - top - bot;
+  const Wa = W0 - 2 * side, sX = clamp((pr.geoX || 100) / 100, 0.5, 2), sY = clamp((pr.geoY || 100) / 100, 0.5, 2), gk = clamp((pr.geoK || 0) / 100, -0.4, 0.4);
+  P.W = Math.round(Wa / sX); P.H = H0 - top - bot;
+  el.geo.style.width = P.W + 'px'; el.geo.style.height = P.H + 'px';
   const fs = pr.size * 96 / 72, pad = Math.round(P.W * pr.margin / 100);
   P.fs = fs;
   el.content.style.fontSize = fs + 'px';
   P.anchor = Math.round(P.H * pr.anchor / 100);
+  el.geo.style.transform = geoTransform(P.W, P.H, Wa, P.anchor, sX, sY, gk);
   // İlk satır baştan okuma çizgisi hizasında dursun (çizgi görünür olsun olmasın)
   const padTop = Math.max(Math.round(fs * 0.35), Math.round(P.anchor - fs * pr.lineHeight / 2));
   el.content.style.padding = `${padTop}px ${pad}px ${Math.round(P.H)}px`;
@@ -140,6 +238,7 @@ function layout(){
   P.off = 0; P.offV = 0; P.mark = -1;
   P.scroll = pathScroll(P.u);
   focusLayout();
+  drawPattern();
 }
 function measure(){
   const L = [], A = P.A;
@@ -456,10 +555,10 @@ export function requestFull(){
   const d = document.documentElement, req = d.requestFullscreen || d.webkitRequestFullscreen;
   if (req) { try { const pr = req.call(d); if (pr && pr.then) pr.then(lockOrientation).catch(() => {}); } catch (e) {} }
 }
-export function start({body, scriptId = null, title = '', targetSec = null, startChar = 0, calibrate = false, lead = true, autoplay = true}){
+export function start({body, scriptId = null, title = '', targetSec = null, startChar = 0, calibrate = false, lead = true, autoplay = true, pattern = false}){
   if (P.on) stopStage(true);
   if (!calibrate && S.g.fullscreen) requestFull();
-  P.on = true; P.cal = calibrate; P.lead = lead;
+  P.on = true; P.cal = calibrate; P.lead = lead; P.forcePat = calibrate && pattern;
   Object.assign(P, {jumpSeen: null, scriptId, title, body, targetSec, rev: P.rev + 1, u: 0, playing: false, ended: false, counting: false,
     scroll: 0, off: 0, offV: 0, boost: 0, gain: 1, holdIdx: 0, holdLeft: 0, lastH: 0, syncAdj: 0,
     playSec: 0, activeSec: 0, stops: 0, rewinds: 0, startedAt: Date.now()});
@@ -486,7 +585,8 @@ export function start({body, scriptId = null, title = '', targetSec = null, star
   H.onChange();
 }
 function stopStage(silent){
-  P.on = false; P.playing = false; P.counting = false; P.boost = 0; P.cal = false;
+  P.on = false; P.playing = false; P.counting = false; P.boost = 0; P.cal = false; P.forcePat = false;
+  el.calPat.hidden = el.calTxt.hidden = true; el.calPat.textContent = el.calTxt.textContent = '';
   el.count.hidden = true; el.hud.hidden = true; el.ctl.classList.remove('show'); el.vind.hidden = true;
   el.stage.hidden = true; document.body.classList.remove('stage-on');
   el.content.textContent = ''; P.chars = []; P.tokEls = []; P.lines = []; P.knots = [];

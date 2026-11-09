@@ -339,6 +339,11 @@ document.addEventListener('click', e => {
   const c = e.target.closest('[data-close]'); if (c) { c.closest('.modal').hidden = true; return; }
   if (e.target.classList && e.target.classList.contains('modal') && e.target.id !== 'capModal') e.target.hidden = true;
 });
+// "Bu cihazda kalibrasyonu aç": desen bu cihazın ekranında açılır (dokununca ya da Esc ile kapanır)
+window.addEventListener('prompter:calhere', () => {
+  if (localStage()) { note('Akış sürerken kalibrasyon açılamaz.'); return; }
+  E.start({body: CAL_TEXT, calibrate: true, startChar: 150, pattern: true});
+});
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !localStage() && !capturing()) for (const m of $$('.modal')) if (!m.hidden && m.id !== 'capModal') m.hidden = true;
 });
