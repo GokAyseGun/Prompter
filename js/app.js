@@ -284,7 +284,9 @@ function renderMini(box, body, mirrored){
   const W = w * sc, H = h * sc;
   box.style.width = W + 'px'; box.style.height = H + 'px';
   const top = h * pr.cropTop / 100 * sc, bot = h * pr.cropBottom / 100 * sc, side = w * pr.cropSide / 100 * sc;
-  const aW = W - 2 * side, aH = H - top - bot, fs = pr.size * 96 / 72 * sc, pad = aW * pr.margin / 100, anchor = aH * pr.anchor / 100;
+  const aW = W - 2 * side, aH = H - top - bot, anchor = aH * pr.anchor / 100;
+  const gsx = clamp((pr.geoX || 100) / 100, 0.5, 2), gsy = clamp((pr.geoY || 100) / 100, 0.5, 2), gk = clamp((pr.geoK || 0) / 100, -0.4, 0.4);
+  const Wg = aW / gsx, fs = pr.size * 96 / 72 * sc, pad = Wg * pr.margin / 100;
   const A = analyze((body && body.trim() ? body : SAMPLE).slice(0, 1400), {...g, hide: {n: !sh.notes, h: !sh.heads}});
   const parts = [];
   A.paras.forEach(p => {
@@ -297,9 +299,9 @@ function renderMini(box, body, mirrored){
     }).filter(Boolean);
     parts.push(`<div class="para${p.type === 'h' ? ' hd' : p.type === 'n' ? ' nt' : ''}">${toks.join(' ')}</div>`);
   });
-  box.innerHTML = `<div class="m-mir"><div class="m-area" style="top:${top}px;bottom:${bot}px;left:${side}px;right:${side}px">
+  box.innerHTML = `<div class="m-mir"><div class="m-area" style="top:${top}px;bottom:${bot}px;left:${side}px;right:${side}px"><div class="m-geo" style="width:${Wg}px;height:${aH}px;opacity:${clamp((pr.bright ?? 100) / 100, 0.3, 1)};transform:${E.geoTransform(Wg, aH, aW, anchor, gsx, gsy, gk)}">
     <div class="m-content" style="font-size:${fs}px;padding:${fs * 0.35}px ${pad}px;font-family:${fontOf(g.font).fam.replace(/"/g, "'")},sans-serif;font-weight:${g.weight};font-style:${g.italic ? 'italic' : 'normal'};line-height:${pr.lineHeight};letter-spacing:${pr.letter}em;text-align:${g.align};color:${g.textColor};--em:${g.emphColor};--mk:${g.markColor};--nt:${g.noteColor}">${parts.join('')}</div>
-    <div class="m-ft"></div><div class="m-fb"></div><div class="m-ul"></div><div class="m-ar l"></div><div class="m-ar r"></div></div></div>`;
+    <div class="m-ft"></div><div class="m-fb"></div><div class="m-ul"></div><div class="m-ar l"></div><div class="m-ar r"></div></div></div></div>`;
   const content = box.querySelector('.m-content'), area = box.querySelector('.m-area');
   const spans = [...content.querySelectorAll('.tk')];
   const lines = []; let cur = null;
@@ -730,7 +732,7 @@ function wireTakes(){
   $('#takesOnly').addEventListener('change', load);
   $('#takesBody').addEventListener('click', async e => {
     const d = e.target.closest('[data-deltake]'); if (!d) return;
-    try { await D.deleteTake(d.dataset.deltake); TAKES = TAKES.filter(t => String(t.id) !== d.dataset.deltake); renderTakes(); } catch (x) { note('Silinemedi.'); }
+    try { await D.deleteTake(d.dataset.deltake); TAKES = TAKES.filter(t => String(t.id) !== d.dataset.deltake); renderTakes(); VERI.rows = VERI.rows.filter(t => String(t.id) !== d.dataset.deltake); renderVeri(); } catch (x) { note('Silinemedi.'); }
   });
   $('#takesStats').addEventListener('click', e => {
     const b = e.target.closest('[data-usesps]'); if (!b) return;
@@ -753,6 +755,148 @@ function renderTakes(){
     <div><b>${done.length ? fmtTime(done.reduce((a, t) => a + t.play_sec, 0) / done.length) : '—'}</b><span>ortalama süre</span></div>
     <div><b>${med ? num(med) : '—'}</b><span>gerçek hızınız (hece/sn)${med ? ` ≈ ${Math.round(med * 60 / avg)} kelime/dk` : ''}</span></div>
     ${med ? `<div class="act"><button class="btn sm" data-usesps="${med.toFixed(2)}" type="button">Varsayılan hızım yap</button></div>` : ''}`;
+}
+/* ================= VERİLER ================= */
+const VERI = {rows: [], scope: 'all', range: 30, loaded: false, busy: false};
+const TONE_NAME = {normal: 'Normal', slow: 'Yavaş', fast: 'Hızlı', calm: 'Sakin', excited: 'Heyecanlı'};
+const DAYPART = [['Sabah (06–12)', 6, 12], ['Öğleden sonra (12–17)', 12, 17], ['Akşam (17–22)', 17, 22], ['Gece (22–06)', 22, 30]];
+const medOf = a => { if (!a.length) return null; const b = [...a].sort((x, y) => x - y), m = b.length >> 1; return b.length % 2 ? b[m] : (b[m - 1] + b[m]) / 2; };
+const avgSylOf = t => (t.extra && t.extra.avgSyl) || 2.8;
+const wpmOf = t => t.actual_sps * 60 / avgSylOf(t);
+const readWords = t => Math.max(0, Math.round((t.words || 0) * Math.min(1, Math.max(0, (t.progress || 0) - ((t.extra && t.extra.totalChars) ? (t.extra.startChar || 0) / t.extra.totalChars : 0)))));
+const pct = (v, d = 0) => (v > 0 ? '+' : v < 0 ? '−' : '') + '%' + num(Math.abs(v) * 100, d);
+function veriRows(){
+  const since = VERI.range ? Date.now() - VERI.range * 864e5 : 0;
+  return VERI.rows.filter(t => Date.parse(t.started_at) >= since && (VERI.scope !== 'script' || (CUR.s && t.script_id === CUR.s.id)));
+}
+function veriSum(){
+  if (!VERI.loaded) return 'okuma verileri';
+  const R = veriRows(), sp = R.filter(t => t.actual_sps && t.play_sec > 20), m = medOf(sp.map(wpmOf));
+  return `${R.length} çekim${m ? ` · ${Math.round(m)} kelime/dk` : ''}`;
+}
+async function loadVeri(){
+  if (VERI.busy) return; VERI.busy = true;
+  $('#veriBody').innerHTML = '<p class="hint">Yükleniyor…</p>';
+  try { await D.flushTakes(); VERI.rows = await D.listTakes(null, 1000); VERI.loaded = true; renderVeri(); }
+  catch (e) { $('#veriBody').innerHTML = '<p class="hint">Veriler yüklenemedi. İnternet bağlantısını kontrol edin.</p>'; }
+  VERI.busy = false;
+}
+function speedChart(T){
+  const pts = T.slice(0, 40).reverse(); if (pts.length < 2) return '';
+  const W = 640, H = 170, l = 40, r = 12, t = 14, b = 26;
+  const ys = pts.flatMap(x => [wpmOf(x), x.set_sps ? x.set_sps * 60 / avgSylOf(x) : wpmOf(x)]);
+  let lo = Math.min(...ys), hi = Math.max(...ys); const padY = Math.max(6, (hi - lo) * 0.15); lo = Math.max(0, lo - padY); hi += padY;
+  const X = i => l + i * (W - l - r) / (pts.length - 1), Y = v => t + (hi - v) / (hi - lo) * (H - t - b);
+  const line = f => pts.map((p, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)} ${Y(f(p)).toFixed(1)}`).join('');
+  const ticks = [lo, (lo + hi) / 2, hi].map(v => `<text x="${l - 6}" y="${Y(v) + 4}" text-anchor="end">${Math.round(v)}</text><path d="M${l} ${Y(v)}H${W - r}" stroke="#222a33"/>`).join('');
+  const d0 = new Date(pts[0].started_at), d1 = new Date(pts[pts.length - 1].started_at), fd = d => d.toLocaleDateString('tr-TR', {day: 'numeric', month: 'short'});
+  return `<div class="vchart"><svg viewBox="0 0 ${W} ${H}" font-size="11" fill="#8a96a3">${ticks}
+    <path d="${line(p => p.set_sps ? p.set_sps * 60 / avgSylOf(p) : wpmOf(p))}" fill="none" stroke="#8a96a3" stroke-width="1.5" stroke-dasharray="5 5"/>
+    <path d="${line(wpmOf)}" fill="none" stroke="#a6dcf2" stroke-width="2.2"/>
+    ${pts.map((p, i) => `<circle cx="${X(i)}" cy="${Y(wpmOf(p))}" r="3" fill="${p.completed ? '#a6dcf2' : '#0d1014'}" stroke="#a6dcf2"><title>${esc(p.script_title || '')} · ${Math.round(wpmOf(p))} kelime/dk</title></circle>`).join('')}
+    <text x="${l}" y="${H - 6}">${fd(d0)}</text><text x="${W - r}" y="${H - 6}" text-anchor="end">${fd(d1)}</text>
+    <text x="${(l + W - r) / 2}" y="${H - 6}" text-anchor="middle">— gerçek hız (kelime/dk) · - - ayar · dolu nokta: tamamlanan</text></svg></div>`;
+}
+function hardSpots(R){
+  if (!CUR.s || !CUR.s.body) return '';
+  const body = CUR.s.body, sents = [], re = /[^.!?…\n]+[.!?…]*/g; let m;
+  while ((m = re.exec(body))) if (m[0].trim().length > 3) sents.push({a: m.index, b: m.index + m[0].length, txt: m[0], s: 0, r: 0, sp: 0});
+  for (const t of R) for (const [ty, src] of ((t.extra && t.extra.ev) || [])) {
+    const x = sents.find(z => src >= z.a && src < z.b) || sents.filter(z => z.a <= src).pop(); if (!x) continue;
+    if (ty === 's') x.s++; else if (ty === 'r') x.r++; else x.sp++;
+  }
+  const top = sents.filter(x => x.s + x.r + x.sp).sort((p, q) => (q.s + q.r * 1.5 + q.sp * 0.5) - (p.s + p.r * 1.5 + p.sp * 0.5)).slice(0, 6);
+  if (!top.length) return '<p class="hint">Bu metinde henüz durma ya da geri sarma kaydı yok.</p>';
+  const clean = s => s.replace(/\[\/?[^\]]*\]/g, '').replace(/\*\*/g, '').replace(/\s+/g, ' ').trim();
+  return `<table class="veri"><thead><tr><th>Cümle</th><th>Durma</th><th>Geri</th><th>Hız değişikliği</th></tr></thead><tbody>${top.map(x => `<tr><td class="q">${esc(clean(x.txt).slice(0, 160))}</td><td>${x.s}</td><td>${x.r}</td><td>${x.sp}</td></tr>`).join('')}</tbody></table>`;
+}
+function renderVeri(){
+  const box = $('#veriBody'); if (!box) return;
+  updateSums();
+  if (!VERI.loaded) return;
+  const R = veriRows();
+  if (!R.length) { box.innerHTML = `<p class="hint">${VERI.rows.length ? 'Bu filtrede çekim yok.' : 'Henüz çekim yok. Her akış bitişinde otomatik kaydedilir.'}</p>`; return; }
+  const done = R.filter(t => t.completed), sp = R.filter(t => t.actual_sps && t.play_sec > 20);
+  const totSec = R.reduce((a, t) => a + (t.play_sec || 0), 0), words = R.reduce((a, t) => a + readWords(t), 0);
+  const mW = medOf(sp.map(wpmOf)), mS = medOf(sp.map(t => t.actual_sps));
+  const ratio = medOf(sp.filter(t => t.set_sps && t.mode !== 'follow').map(t => t.actual_sps / t.set_sps));
+  const stops = R.reduce((a, t) => a + (t.stops || 0), 0), rew = R.reduce((a, t) => a + (t.rewinds || 0), 0);
+  const k1 = n => words > 50 ? num(n / words * 1000, 1) : '—';
+  const tg = done.filter(t => t.target_sec), tgDev = medOf(tg.map(t => (t.play_sec - t.target_sec) / t.target_sec));
+  const pl = done.filter(t => t.extra && t.extra.planSec > 10), plDev = medOf(pl.map(t => (t.play_sec - t.extra.planSec) / t.extra.planSec));
+  const sum = (k) => R.reduce((a, t) => a + ((t.extra && t.extra[k]) || 0), 0);
+  const tile = (b, s) => `<div><b>${b}</b><span>${s}</span></div>`;
+  let h = `<div class="stats">
+    ${tile(`${R.length}<small style="font-size:13px;color:var(--muted)"> / ${done.length} tamam</small>`, 'çekim')}
+    ${tile(fmtTime(totSec), 'toplam okuma')}
+    ${tile(words.toLocaleString('tr-TR'), 'okunan kelime (yaklaşık)')}
+    ${tile(mW ? Math.round(mW) : '—', `gerçek hız, kelime/dk${mS ? ` · ${num(mS)} hece/sn` : ''}`)}
+    ${tile(ratio ? pct(ratio - 1) : '—', 'gerçek hızın ayara göre')}
+    ${tile(plDev != null ? pct(plDev) : '—', 'süre, planlanana göre')}
+    ${tile(tgDev != null ? pct(tgDev) : '—', 'süre, hedef süreye göre')}
+    ${tile(`${k1(stops)} · ${k1(rew)}`, '1000 kelimede durma · geri sarma')}
+    ${tile(fmtTime(sum('holdSec')), 'durak ([DUR]) beklemesi')}
+    ${tile(fmtTime(sum('pausedSec')), 'duraklatılmış süre')}
+  </div>`;
+  // öneriler
+  const tips = [];
+  if (R.length < 5) tips.push('Daha güvenilir sonuçlar için en az 5 çekim gerekiyor; sayılar şimdilik yön gösterir.');
+  if (ratio && Math.abs(ratio - 1) > 0.07) {
+    const v = medOf(sp.slice(0, 10).map(t => t.actual_sps));
+    tips.push(`Gerçek hızın ayardan ${pct(ratio - 1)} ${ratio < 1 ? 'yavaş' : 'hızlı'}. ${v ? `<button class="btn sm" data-usesps="${v.toFixed(2)}" type="button">Varsayılan hızım ${num(v)} hece/sn olsun</button>` : ''}`);
+  }
+  const TA = {}; for (const t of R) for (const [k, b] of Object.entries((t.extra && t.extra.tones) || {})) { const a = TA[k] || (TA[k] = {u: 0, s: 0, n: 0}); a.u += b.u; a.s += b.s; a.n++; }
+  const nrm = TA.normal && TA.normal.s > 10 ? TA.normal.u / TA.normal.s : null;
+  if (nrm) {
+    const chk = (k, want, txt) => { const a = TA[k]; if (!a || a.s < 5) return; const d = a.u / a.s / nrm - 1; if (want < 0 ? d > -0.04 : d < 0.04) tips.push(`${txt} (normale göre ${pct(d)}). İşaretli yerlerde hızı elle ${want < 0 ? 'düşürmeyi' : 'artırmayı'} dene; okunuş işaretleri hızı kendiliğinden değiştirmez.`); };
+    chk('slow', -1, '<b>Yavaş</b> işaretli bölümlerde yeterince yavaşlamıyorsun');
+    chk('fast', 1, '<b>Hızlı</b> işaretli bölümlerde yeterince hızlanmıyorsun');
+  }
+  if (tgDev != null && Math.abs(tgDev) > 0.1) tips.push(`Tamamlanan çekimler hedef süreden ortalama ${pct(tgDev)} ${tgDev > 0 ? 'uzun' : 'kısa'}. Metin projesinde süreyi hesaplarken bunu göz önüne al.`);
+  if (words > 300 && stops / words * 1000 > 8) tips.push('Sık duruyorsun. Aşağıdaki “zorlandığın yerler” tablosundaki cümleleri sadeleştirmek ya da satır aralığını artırmak yardımcı olabilir.');
+  const parts = DAYPART.map(([n, a, b]) => { const X = R.filter(t => { let hr = new Date(t.started_at).getHours(); if (hr < 6) hr += 24; return hr >= a && hr < b; }); const w = X.reduce((s, t) => s + readWords(t), 0); return {n, X, w, st: w > 50 ? X.reduce((s, t) => s + t.stops + t.rewinds, 0) / w * 1000 : null, m: medOf(X.filter(t => t.actual_sps && t.play_sec > 20).map(wpmOf))}; });
+  const good = parts.filter(p => p.X.length >= 3 && p.st != null).sort((p, q) => p.st - q.st);
+  if (good.length >= 2) tips.push(`En akıcı okuduğun zaman dilimi: <b>${good[0].n}</b> (1000 kelimede ${num(good[0].st, 1)} durma ve geri sarma).`);
+  if (tips.length) h += `<div class="veri-h">Öneriler</div><ul class="vtips">${tips.map(t => `<li>${t}</li>`).join('')}</ul>`;
+  // hız grafiği
+  const ch = speedChart(sp);
+  if (ch) h += `<div class="veri-h">Hız, çekimden çekime</div>${ch}`;
+  // okunuş bölümleri
+  const tk = Object.keys(TA).filter(k => TA[k].s >= 3);
+  if (tk.length) h += `<div class="veri-h">Okunuş bölümlerine göre gerçek hız</div><table class="veri"><thead><tr><th>Okunuş</th><th>Okuma süresi</th><th>Gerçek hız</th><th>Normale göre</th></tr></thead><tbody>${['normal', 'slow', 'fast', 'calm', 'excited'].filter(k => tk.includes(k)).map(k => { const a = TA[k], v = a.u / a.s, d = nrm && k !== 'normal' ? v / nrm - 1 : null; return `<tr><td>${TONE_NAME[k]}</td><td>${fmtTime(a.s)}</td><td>${num(v)} hece/sn · ${Math.round(v * 60 / 2.8)} kelime/dk</td><td>${d == null ? '—' : `<span class="${d < 0 ? 'down' : 'up'}">${pct(d)}</span>`}</td></tr>`; }).join('')}</tbody></table>`;
+  // zaman dilimi
+  h += `<div class="veri-h">Günün saatine göre</div><table class="veri"><thead><tr><th>Zaman</th><th>Çekim</th><th>Gerçek hız</th><th>1000 kelimede durma + geri</th></tr></thead><tbody>${parts.filter(p => p.X.length).map(p => `<tr><td>${p.n}</td><td>${p.X.length}</td><td>${p.m ? Math.round(p.m) + ' kelime/dk' : '—'}</td><td>${p.st == null ? '—' : num(p.st, 1)}</td></tr>`).join('')}</tbody></table>`;
+  // ekran ve yazı boyutu
+  const grp = (key, label) => {
+    const G = new Map(); for (const t of R) { const k = key(t); if (k == null) continue; (G.get(k) || G.set(k, []).get(k)).push(t); }
+    if (G.size < 1) return '';
+    return `<table class="veri"><thead><tr><th>${label}</th><th>Çekim</th><th>Gerçek hız</th><th>1000 kelimede durma + geri</th></tr></thead><tbody>${[...G].sort((a, b) => b[1].length - a[1].length).map(([k, X]) => { const w = X.reduce((s, t) => s + readWords(t), 0), m = medOf(X.filter(t => t.actual_sps && t.play_sec > 20).map(wpmOf)); return `<tr><td>${esc(String(k))}</td><td>${X.length}</td><td>${m ? Math.round(m) + ' kelime/dk' : '—'}</td><td>${w > 50 ? num(X.reduce((s, t) => s + t.stops + t.rewinds, 0) / w * 1000, 1) : '—'}</td></tr>`; }).join('')}</tbody></table>`;
+  };
+  h += `<div class="veri-h">Cihaz ve mod</div>${grp(t => `${t.device || '—'} · ${PNAME[t.profile] || t.profile || ''} · ${MODE_NAME[t.mode] || t.mode}`, 'Cihaz · ekran tipi · mod')}`;
+  const sizes = new Set(R.map(t => t.extra && t.extra.cfg && t.extra.cfg.size).filter(Boolean));
+  if (sizes.size > 1) h += `<div class="veri-h">Yazı boyutuna göre</div>${grp(t => t.extra && t.extra.cfg && t.extra.cfg.size ? Math.round(t.extra.cfg.size) + ' pt' : null, 'Yazı boyutu')}`;
+  // zorlandığın yerler
+  h += `<div class="veri-h">Zorlandığın yerler${CUR.s ? ` · ${esc(CUR.s.title || 'Adsız metin')}` : ''}</div>`;
+  h += VERI.scope === 'script' ? hardSpots(R) : '<p class="hint">Durduğun ve geri sardığın cümleleri görmek için <b>Bu metin</b>i seç.</p>';
+  box.innerHTML = h;
+}
+function veriCsv(){
+  const R = veriRows(); if (!R.length) { note('Dışa aktarılacak çekim yok.'); return; }
+  const dc = v => v == null || v === '' ? '' : (typeof v === 'number' ? String(+v.toFixed(3)).replace('.', ',') : String(v));
+  const q = v => { const s = dc(v); return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const head = ['tarih', 'metin', 'okuma_sn', 'ilerleme', 'tamamlandi', 'kelime', 'gercek_hece_sn', 'gercek_kelime_dk', 'ayar_hece_sn', 'mod', 'durma', 'geri_sarma', 'ekran_tipi', 'cihaz', 'hedef_sn', 'planlanan_sn', 'duraklatilmis_sn', 'durak_bekleme_sn', 'hizli_sarma_sn', 'hiz_degisikligi', 'yazi_boyutu', 'uzunluk', 'egim', 'okunus_hizlari'];
+  const rows = R.map(t => { const x = t.extra || {}, c = x.cfg || {}; return [new Date(t.started_at).toLocaleString('tr-TR'), t.script_title, t.play_sec, t.progress, t.completed ? 'evet' : 'hayır', t.words, t.actual_sps, t.actual_sps ? wpmOf(t) : null, t.set_sps, MODE_NAME[t.mode] || t.mode, t.stops, t.rewinds, PNAME[t.profile] || t.profile, t.device, t.target_sec, x.planSec, x.pausedSec, x.holdSec, x.boostSec, x.speedChanges, c.size, c.geoY, c.geoK, x.tones ? JSON.stringify(x.tones) : ''].map(q).join(';'); });
+  download(`gg-prompter-veriler-${new Date().toISOString().slice(0, 10)}.csv`, '﻿' + [head.join(';'), ...rows].join('\n'), 'text/csv;charset=utf-8');
+}
+function wireVeri(){
+  const seg = (id, key, cast) => $(id).addEventListener('click', e => { const b = e.target.closest('button[data-v]'); if (!b) return; VERI[key] = cast(b.dataset.v); for (const x of $(id).querySelectorAll('button')) x.classList.toggle('on', x === b); renderVeri(); });
+  seg('#veriScope', 'scope', String); seg('#veriRange', 'range', Number);
+  $('#veriCsv').addEventListener('click', veriCsv);
+  $('#veriTakes').addEventListener('click', () => $('#takesBtn').click());
+  $('#veriBody').addEventListener('click', e => {
+    const b = e.target.closest('[data-usesps]'); if (!b) return;
+    setG('personalSps', +b.dataset.usesps); setG('sps', +b.dataset.usesps); note('Varsayılan hızınız güncellendi.');
+  });
 }
 /* hız ölçümü */
 function wireSpeedTest(){
@@ -823,7 +967,7 @@ function makeFolds(){
       const open = !card.classList.contains('open');
       card.classList.toggle('open', open); card.classList.remove('shown'); h2.setAttribute('aria-expanded', String(open));
       clearTimeout(card._shownT);
-      if (open) { card._shownT = setTimeout(() => { if (card.classList.contains('open')) card.classList.add('shown'); }, 560); if (card.dataset.fold === '7') renderPreview(); }
+      if (open) { card._shownT = setTimeout(() => { if (card.classList.contains('open')) card.classList.add('shown'); }, 560); if (card.dataset.fold === '7') renderPreview(); if (card.dataset.fold === '8' && !VERI.loaded) loadVeri(); }
     };
     h.addEventListener('click', e => { if (e.target.closest('button, input, label, select, a, textarea')) return; toggle(); });
     h2.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
@@ -840,8 +984,9 @@ function updateSums(){
   set('5', `çizgi %${Math.round(pr.anchor)} · ${SHOW_ITEMS.filter(([k]) => pr.show[k]).length}/${SHOW_ITEMS.length} öğe görünür`);
   set('6', `yazı, işaret, not ve ${TONE_VARS.length} okunuş rengi`);
   set('7', PNAME[type] || '');
-  set('8', `${ACTIONS.filter(([a]) => (S.binds[a] || []).length).length}/${ACTIONS.length} eylemde tuş`);
-  set('9', PEERS.length ? `${PEERS.length} cihaz bağlı` : 'bağlı cihaz yok');
+  set('8', veriSum());
+  set('9', `${ACTIONS.filter(([a]) => (S.binds[a] || []).length).length}/${ACTIONS.length} eylemde tuş`);
+  set('10', PEERS.length ? `${PEERS.length} cihaz bağlı` : 'bağlı cihaz yok');
 }
 function mountPrompter(){
   $('#vPrompter').hidden = false;
@@ -857,7 +1002,7 @@ function mountPrompter(){
   FORMS.push(bindForm($('#fEkran'), ctx), bindForm($('#fYazi'), ctx), bindForm($('#fAkis'), ctx), bindForm($('#fSticks'), ctx), bindForm($('#fGorunen'), ctx), bindForm($('#fRenk'), ctx));
   renderTgtSelects();
   makeFolds();
-  wireEditor(); wireLib(); wireVersions(); wireTakes(); wireSpeedTest();
+  wireEditor(); wireLib(); wireVersions(); wireTakes(); wireVeri(); wireSpeedTest();
   wireBinds($('#binds'));
   $('#resetBinds').addEventListener('click', () => { resetBinds(); renderBinds($('#binds')); note('Varsayılan tuşlar yüklendi.'); });
   $('#miniMirror').addEventListener('change', renderPreview);
@@ -1059,7 +1204,7 @@ function onStageExit({take, lastChar, scriptId, lead}){
   if (lead && LINK) LINK.send('stop', {scriptId, lastChar});
   if (lead) {
     if (scriptId) D.touchScript(scriptId, {last_char: lastChar});
-    if (take.play_sec >= 5) D.saveTake(take).catch(() => {});
+    if (take.play_sec >= 5) D.saveTake(take).then(() => { VERI.loaded = false; if ($('.card[data-fold="8"].open')) loadVeri(); }, () => {});
     if (isRole('prompter') && CUR.s && CUR.s.id === scriptId) CUR.s.last_char = lastChar;
   }
   LS = null;

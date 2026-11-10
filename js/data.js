@@ -21,8 +21,8 @@ export const listVersions = async id =>
 export const snapshotVersion = async (id, title, body) =>
   must(await sb.from('script_versions').insert({script_id:id, title, body}));
 
-export const listTakes = async (scriptId) => {
-  let q = sb.from('takes').select('*').order('started_at', {ascending:false}).limit(200);
+export const listTakes = async (scriptId, limit = 200) => {
+  let q = sb.from('takes').select('*').order('started_at', {ascending:false}).limit(limit);
   if (scriptId) q = q.eq('script_id', scriptId);
   return must(await q);
 };

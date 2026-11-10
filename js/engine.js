@@ -152,7 +152,7 @@ function homography(src, dst){
   const h = b.map((v, i) => v / A[i][i]);
   return [h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], 1];
 }
-function geoTransform(Wg, Hh, Wa, a, sX, sY, k){
+export function geoTransform(Wg, Hh, Wa, a, sX, sY, k){
   if (Math.abs(k) < 1e-4) return `matrix(${sX},0,0,${sY},${(Wa - sX * Wg) / 2},${a * (1 - sY)})`;
   const c = Wa / 2, hT = Wa / 2 * (1 + k), hB = Wa / 2 * (1 - k), yT = a - a * sY, yB = a + (Hh - a) * sY;
   const h = homography([[0, 0], [Wg, 0], [Wg, Hh], [0, Hh]], [[c - hT, yT], [c + hT, yT], [c + hB, yB], [c - hB, yB]]);
@@ -352,7 +352,7 @@ function seek(u, smooth = true){
 function seekLine(d){
   if (!P.lines.length) return;
   const t = lineAt(P.u) + d;
-  if (d < 0) P.rewinds++;
+  if (d < 0) rw();
   if (t < 0) seek(0); else if (t >= P.lines.length) seek(P.total); else seek(P.lines[t].uA);
 }
 function seekSection(d){
@@ -360,12 +360,15 @@ function seekSection(d){
   if (!SE.length) { toast('Metinde # bölüm başlığı yok'); return; }
   if (d > 0) { const s = SE.find(x => x.u > P.u + 0.01); if (s) { seek(s.u); toast(s.title); } else toast('Son bölümdesiniz'); }
   else {
-    P.rewinds++;
+    rw();
     let i = -1; for (let k = 0; k < SE.length; k++) if (SE[k].u < P.u - 0.01) i = k;
     if (i >= 0 && P.u - SE[i].u < S.g.sps * 1.5 && i > 0) i--;
     if (i >= 0) { seek(SE[i].u); toast(SE[i].title); } else { seek(0); toast('Başa dönüldü'); }
   }
 }
+/* Veriler: durma, geri sarma ve hız değişikliği noktaları (metindeki karakter konumuyla) */
+function logEv(t){ if (!P.ev || P.ev.length >= 300 || !P.A) return; const k = tokAt(P.u), tk = k >= 0 ? P.A.tokens[k] : null; P.ev.push([t, tk ? tk.src : 0, +P.playSec.toFixed(1)]); }   // [tür, metindeki konum, okuma saniyesi]
+function rw(){ P.rewinds++; logEv('r'); }
 const setSpsSoon = debounce(v => setG('sps', v), 150);
 function setSps(v, quiet){
   S.g.sps = clamp(Math.round(v * 100) / 100, 1.5, 10);
@@ -381,7 +384,7 @@ export function action(a){
     case 'toggle':
       if (P.counting) { P.counting = false; el.count.hidden = true; P.playing = true; }
       else if (P.ended) { seek(0); P.playing = true; }
-      else { P.playing = !P.playing; if (!P.playing) P.stops++; }
+      else { P.playing = !P.playing; if (!P.playing) { P.stops++; logEv('s'); } }
       break;
     case 'play': if (!P.playing) action('toggle'); return;
     case 'pause': if (P.playing || P.counting) action('toggle'); return;
@@ -389,9 +392,9 @@ export function action(a){
     case 'linePrev': seekLine(-1); break;
     case 'sectionNext': seekSection(1); break;
     case 'sectionPrev': seekSection(-1); break;
-    case 'faster': setSps(S.g.sps + 0.25); break;
-    case 'slower': setSps(S.g.sps - 0.25); break;
-    case 'restart': P.rewinds++; seek(0); toast('Başa dönüldü'); break;
+    case 'faster': P.spdN++; logEv('+'); setSps(S.g.sps + 0.25); break;
+    case 'slower': P.spdN++; logEv('-'); setSps(S.g.sps - 0.25); break;
+    case 'restart': rw(); seek(0); toast('Başa dönüldü'); break;
     case 'modeCycle': { const i = MODES.findIndex(x => x[0] === S.g.mode); const m = MODES[(i + 1) % MODES.length]; setG('mode', m[0]); toast(m[1]); break; }
     case 'exit': exit(); return;
   }
@@ -400,7 +403,7 @@ export function action(a){
 export function hold(a, on){
   if (!P.on || P.cal) return;
   const dir = a === 'boostFwd' || a === 'fwd' ? 1 : -1;
-  if (on) { if (dir < 0 && P.boost >= 0) P.rewinds++; P.boost = dir; }
+  if (on) { if (dir < 0 && P.boost >= 0) rw(); P.boost = dir; }
   else if (P.boost === dir) P.boost = 0;
 }
 let stickToast = 0;
@@ -561,7 +564,8 @@ export function start({body, scriptId = null, title = '', targetSec = null, star
   P.on = true; P.cal = calibrate; P.lead = lead; P.forcePat = calibrate && pattern;
   Object.assign(P, {jumpSeen: null, scriptId, title, body, targetSec, rev: P.rev + 1, u: 0, playing: false, ended: false, counting: false,
     scroll: 0, off: 0, offV: 0, boost: 0, gain: 1, holdIdx: 0, holdLeft: 0, lastH: 0, syncAdj: 0,
-    playSec: 0, activeSec: 0, stops: 0, rewinds: 0, startedAt: Date.now()});
+    playSec: 0, activeSec: 0, stops: 0, rewinds: 0, startedAt: Date.now(),
+    ev: [], spdN: 0, holdSec: 0, boostSec: 0, vOpenSec: 0, toneSt: {}, sps0: S.g.sps, planSec: null});
   document.body.classList.add('stage-on');
   el.stage.hidden = false;
   el.stage.classList.toggle('cal', calibrate);
@@ -578,6 +582,7 @@ export function start({body, scriptId = null, title = '', targetSec = null, star
       if (S.g.countdown) { P.counting = true; P.countEnd = performance.now() + 5000; el.count.hidden = false; el.count.textContent = '5'; }
       else P.playing = true;
     }
+    if (!calibrate) P.planSec = +remainSec().toFixed(1);
     updateHud(); updateCtl(); H.onChange();
   };
   const fl = document.fonts && document.fonts.load ? document.fonts.load(`${S.g.italic ? 'italic ' : ''}${S.g.weight} 40px ${fontOf(S.g.font).fam}`, 'ĞğŞşİıÇçÖöÜü') : null;
@@ -596,6 +601,19 @@ function stopStage(silent){
     if (!H.keepAwake?.()) releaseWake();
   }
 }
+function takeExtra(){
+  const pr = prof(), r1 = v => +(+v).toFixed(1), r3 = v => +(+v).toFixed(3);
+  const tones = {}; for (const k in P.toneSt) { const b = P.toneSt[k]; if (b.s > 1) tones[k] = {u: r1(b.u), s: r1(b.s), sps: r3(b.u / b.s)}; }
+  const wall = (Date.now() - P.startedAt) / 1000;
+  return {
+    v: 1, sps0: P.sps0, planSec: P.planSec, wallSec: r1(wall), pausedSec: r1(Math.max(0, wall - P.playSec)),
+    holdSec: r1(P.holdSec), boostSec: r1(P.boostSec), voiceOpenSec: r1(P.vOpenSec), speedChanges: P.spdN,
+    startChar: Math.floor(headChar(P.uStart)), endChar: Math.floor(headChar(P.maxU)), totalChars: P.chars ? P.chars.length : 0,
+    syllablesTotal: r1(P.A.sylSum), avgSyl: r3(P.A.avgSyl), tones, ev: P.ev,
+    cfg: {size: pr.size, lineHeight: pr.lineHeight, letter: pr.letter, margin: pr.margin, anchor: pr.anchor, geoY: pr.geoY, geoX: pr.geoX, geoK: pr.geoK, bright: pr.bright,
+      font: S.g.font, weight: S.g.weight, pauseOn: S.g.pauseOn, pauseScale: S.g.pauseScale, lead: S.g.lead, followLead: S.g.followLead},
+  };
+}
 export function exit(){
   if (!P.on) return;
   if (P.cal) { stopStage(false); return; }
@@ -604,7 +622,8 @@ export function exit(){
     play_sec: +P.playSec.toFixed(1), progress: P.total ? +(P.maxU / P.total).toFixed(4) : 0, completed: P.ended || P.maxU >= P.total - 0.01,
     syllables: +(P.A.sylSum * Math.max(0, P.maxU - P.uStart) / (P.total || 1)).toFixed(1), words: P.A.wc,
     actual_sps: P.activeSec > 3 ? +((P.maxU - P.uStart) / P.activeSec).toFixed(3) : null, set_sps: S.g.sps,
-    mode: S.g.mode, stops: P.stops, rewinds: P.rewinds, profile: DEV.profile, device: DEV.name,
+    mode: S.g.mode, stops: P.stops, rewinds: P.rewinds, profile: DEV.profile, device: DEV.name, target_sec: P.targetSec || null,
+    extra: takeExtra(),
   };
   const lastChar = P.ended ? 0 : Math.floor(headChar());
   const info = {take, lastChar, scriptId: P.scriptId, lead: P.lead};
@@ -677,6 +696,12 @@ export function tick(now, dt){
     if (P.syncAdj) { const k = Math.min(1, dt * 3); P.u += P.syncAdj * k; P.syncAdj *= (1 - k); if (Math.abs(P.syncAdj) < 0.01) P.syncAdj = 0; }
   }
   if (P.playing || P.holdLeft > 0) P.playSec += dt;
+  if (!P.cal) {
+    if (P.holdLeft > 0 && P.playing) P.holdSec += dt;
+    if (P.boost) P.boostSec += dt;
+    if (vOpen && P.playing) P.vOpenSec += dt;
+  }
+  const u0 = P.u;
   if (rate !== 0) {
     let nu = P.u + rate * dt;
     if (rate > 0 && !P.boost) {
@@ -684,7 +709,14 @@ export function tick(now, dt){
       if (P.lead && S.g.mode !== 'follow' && P.holdIdx < Hs.length && nu >= Hs[P.holdIdx].u) { nu = Hs[P.holdIdx].u; P.holdLeft = Hs[P.holdIdx].sec; P.holdIdx++; }
     } else if (rate < 0) { const Hs = P.A.holds; while (P.holdIdx > 0 && Hs[P.holdIdx - 1].u > nu) P.holdIdx--; }
     P.u = clamp(nu, 0, P.total);
-    if (rate > 0.05 * base) P.activeSec += dt;
+    if (rate > 0.05 * base) {
+      P.activeSec += dt;
+      if (!P.boost && !P.cal && P.u > u0) {             // okunuş bölümüne göre gerçek hız
+        const k = tokAt(P.u), tn = (k >= 0 && P.A.tokens[k].tone) || 'normal';
+        const b = P.toneSt[tn] || (P.toneSt[tn] = {u: 0, s: 0});
+        b.u += P.u - u0; b.s += dt;
+      }
+    }
     if (P.u >= P.total && rate > 0) { P.u = P.total; P.playing = false; P.ended = true; updateHud(); updateCtl(); H.onChange(); }
     else if (P.ended && P.u < P.total) { P.ended = false; updateHud(); }
   }
